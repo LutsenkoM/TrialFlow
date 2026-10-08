@@ -125,9 +125,8 @@
 }
 
 .heatCells span[data-now='true'] {
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 75%),
-    0 0 10px rgb(160 124 255 / 70%);
+  filter: brightness(1.6);
+  box-shadow: 0 0 8px rgb(160 124 255 / 65%);
 }
 
 .heatAxis {

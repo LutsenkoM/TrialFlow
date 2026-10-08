@@ -42,7 +42,12 @@ export class CameraController {
   computeHome(): { x: number; y: number; scale: number } {
     const { screenWidth: w, screenHeight: h } = this.vp
     if (w / h < 0.9) {
-      return { x: 1180, y: WORLD.height / 2 + 30, scale: (h * 0.6) / WORLD.height }
+      // Portrait phone: frame the lanes vertically between the header and the bottom sheet;
+      // the sides are reachable by panning.
+      const top = 150
+      const bottom = 200
+      const scale = (h - top - bottom) / (WORLD.height * 0.92)
+      return { x: 1250, y: WORLD.height / 2 + (bottom - top) / 2 / scale, scale }
     }
     // Screen space taken by UI chrome (header/KPIs, insights panel, timeline).
     const wide = w > 1100
@@ -85,6 +90,12 @@ export class CameraController {
         vp.moveCenter(state.x, state.y)
       },
     })
+  }
+
+  jumpTo(x: number, y: number, scale: number) {
+    this.cancel()
+    this.vp.setZoom(scale, true)
+    this.vp.moveCenter(x, y)
   }
 
   zoomBy(factor: number) {

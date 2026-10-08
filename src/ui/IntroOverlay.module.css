@@ -1,0 +1,80 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: radial-gradient(60% 50% at 50% 50%, rgb(6 10 20 / 30%), rgb(6 10 20 / 75%) 70%);
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.eyebrow {
+  font: 500 12px var(--font-mono);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(48px, 9vw, 112px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.title span {
+  display: inline-block;
+  background: linear-gradient(180deg, #fff 30%, #9fb2d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 40px rgb(140 170 255 / 25%);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-muted);
+}
+
+.progress {
+  width: 180px;
+  height: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--arm-placebo), var(--arm-low), var(--arm-high));
+}
+
+.skip {
+  position: absolute;
+  right: var(--s3);
+  bottom: var(--s3);
+  padding: 8px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
+  font-size: 12px;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.skip:hover {
+  color: var(--ink);
+}

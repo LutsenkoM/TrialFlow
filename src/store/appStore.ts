@@ -30,6 +30,10 @@ export interface AppState {
   filters: Filters
   selectedId: number | null
   hoveredId: number | null
+  /** Mirrors `prefers-reduced-motion`; non-essential animation is skipped when true. */
+  reducedMotion: boolean
+  /** True while the intro sequence runs. */
+  intro: boolean
   setPatients: (patients: Patient[]) => void
   setWeek: (week: number) => void
   setPlaying: (playing: boolean) => void
@@ -39,6 +43,8 @@ export interface AppState {
   resetFilters: () => void
   select: (id: number | null) => void
   hover: (id: number | null) => void
+  setReducedMotion: (v: boolean) => void
+  setIntro: (v: boolean) => void
 }
 
 export function clampWeek(week: number): number {
@@ -53,6 +59,10 @@ export const useAppStore = create<AppState>()((set) => ({
   filters: EMPTY_FILTERS,
   selectedId: null,
   hoveredId: null,
+  reducedMotion:
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+  intro: false,
   setPatients: (patients) => set({ patients }),
   setWeek: (week) => set({ week: clampWeek(week) }),
   setPlaying: (playing) => set({ playing }),
@@ -67,6 +77,8 @@ export const useAppStore = create<AppState>()((set) => ({
   resetFilters: () => set({ filters: EMPTY_FILTERS }),
   select: (selectedId) => set({ selectedId }),
   hover: (hoveredId) => set({ hoveredId }),
+  setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+  setIntro: (intro) => set({ intro }),
 }))
 
 export type { Stage }

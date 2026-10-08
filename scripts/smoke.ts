@@ -29,6 +29,18 @@ function check(cond: boolean, message: string) {
 const readWeek = async () =>
   Number(await page.getAttribute('[role=slider][aria-label="Study week"]', 'aria-valuenow'))
 
+// Intro: title card, then chrome appears and playback starts automatically.
+await page.goto(url, { waitUntil: 'networkidle' })
+check(
+  (await page.getByRole('heading', { name: 'Trial Flow' }).count()) > 0,
+  'intro title shows on first load',
+)
+await page.waitForTimeout(4000)
+check(
+  (await page.getByRole('button', { name: 'Pause' }).count()) === 1,
+  'intro ends and autoplay starts',
+)
+
 await page.goto(url + '?week=5', { waitUntil: 'networkidle' })
 await page.waitForSelector('canvas')
 await page.waitForTimeout(1500)
@@ -44,8 +56,10 @@ const slider = page.getByRole('slider', { name: 'Study week' })
 const box = await slider.boundingBox()
 if (box) {
   await page.mouse.click(box.x + box.width * 0.75, box.y + box.height - 20)
+  await page.waitForTimeout(1600)
   const forward = await readWeek()
   await page.mouse.click(box.x + box.width * 0.2, box.y + box.height - 20)
+  await page.waitForTimeout(1600)
   const back = await readWeek()
   check(forward > 35 && back < 15, `scrubbing works both directions (${forward} → ${back})`)
 }
@@ -53,6 +67,7 @@ if (box) {
 await slider.focus()
 const beforeKey = await readWeek()
 await page.keyboard.press('ArrowLeft')
+await page.waitForTimeout(800)
 check((await readWeek()) < beforeKey, 'arrow key steps backwards')
 
 // Click-to-inspect: find a visible particle on screen and click it.
@@ -92,7 +107,7 @@ const kpi = async (label: string) =>
     )?.replace(/,/g, ''),
   )
 await page.keyboard.press('End')
-await page.waitForTimeout(1200)
+await page.waitForTimeout(2000)
 const before = await kpi('Randomized')
 await page.getByRole('button', { name: 'Filters', exact: true }).click()
 await page.getByRole('button', { name: 'High Dose' }).click()

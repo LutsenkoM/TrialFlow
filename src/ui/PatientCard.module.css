@@ -5,7 +5,10 @@
   overflow: hidden auto;
   pointer-events: auto;
   scrollbar-width: thin;
-  background: linear-gradient(180deg, rgb(18 25 46 / 90%), rgb(9 13 26 / 88%));
+}
+
+.card.card {
+  background: linear-gradient(180deg, rgb(18 25 46 / 92%), rgb(9 13 26 / 90%));
   backdrop-filter: blur(24px) saturate(140%);
 }
 

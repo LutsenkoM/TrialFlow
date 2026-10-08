@@ -20,9 +20,13 @@ import type { Patient } from '../data/types'
 import { useAppStore, type AppState } from '../store/appStore'
 import { durations, easings } from '../theme'
 import { CameraController } from './CameraController'
+import { IntroDirector } from './IntroDirector'
 import { ParticleLayer } from './ParticleLayer'
 import { RibbonsLayer } from './RibbonsLayer'
 import { SelectionLayer } from './SelectionLayer'
+import { BurstLayer } from './BurstLayer'
+import { Minimap } from './Minimap'
+import { TrailLayer } from './TrailLayer'
 import { Starfield } from './Starfield'
 import { createGlowTexture, createHaloTexture, createRingTexture } from './textures'
 import { ZonesLayer, type ZoneKey } from './ZonesLayer'
@@ -34,6 +38,8 @@ const REASON_KEYS: ZoneKey[] = [
   'withdrawal',
   'lost_to_follow_up',
 ]
+/** Max ghost particles for motion trails (5 per travelling particle). */
+const TRAIL_CAPACITY = 6000
 /** Pointer pick radius in screen pixels. */
 const PICK_RADIUS_PX = 14
 
@@ -61,6 +67,18 @@ export class TrialScene {
   private readonly activity = new Map<ZoneKey, number>()
   private readonly unsubscribers: (() => void)[] = []
 
+  private readonly particleGroup = new Container()
+  private readonly bloom = new AdvancedBloomFilter({
+    threshold: 0.3,
+    bloomScale: 0.85,
+    brightness: 0.95,
+    blur: 6,
+    quality: 5,
+  })
+  private readonly bursts: BurstLayer
+  private readonly minimap: Minimap
+  private frameCount = 0
+  private trails: TrailLayer | null = null
   private particles: ParticleLayer | null = null
   private table: PatientTable | null = null
   private frame: FrameBuffers | null = null
@@ -79,6 +97,7 @@ export class TrialScene {
   private gridWeek = -1
   private time = 0
   private hovered = -1
+  private intro: IntroDirector | null = null
 
   constructor(app: Application) {
     this.app = app
@@ -97,10 +116,15 @@ export class TrialScene {
     app.stage.addChild(this.viewport)
     this.viewport.addChild(this.world)
     this.camera = new CameraController(this.viewport)
+    this.minimap = new Minimap(this.viewport, this.glowTexture)
+    app.stage.addChild(this.minimap)
+    this.placeMinimap(app.screen.width, app.screen.height)
 
     this.zones = new ZonesLayer(this.haloTexture)
     this.selection = new SelectionLayer(this.ringTexture)
-    this.world.addChild(this.zones, this.ribbons)
+    this.bursts = new BurstLayer(this.ringTexture, this.glowTexture)
+    this.particleGroup.filters = [this.bloom]
+    this.world.addChild(this.zones, this.ribbons, this.particleGroup, this.bursts, this.selection)
     this.camera.home()
 
     app.renderer.on('resize', this.onResize)
@@ -111,6 +135,14 @@ export class TrialScene {
 
     this.unsubscribers.push(useAppStore.subscribe(this.onStoreChange))
     this.setPatients(useAppStore.getState().patients)
+    if (useAppStore.getState().intro) {
+      this.intro = new IntroDirector(
+        this.world,
+        [this.zones, this.ribbons],
+        this.starfield,
+        this.camera,
+      )
+    }
   }
 
   // ---- store -------------------------------------------------------------
@@ -119,13 +151,19 @@ export class TrialScene {
     if (s.patients !== prev.patients) this.setPatients(s.patients)
     if (s.filters !== prev.filters || s.selectedId !== prev.selectedId) this.emphasisDirty = true
     if (s.selectedId !== prev.selectedId) this.onSelectionChange(s.selectedId)
+    if (!s.intro && prev.intro && this.intro) {
+      this.intro.finish()
+      this.intro = null
+    }
   }
 
   private setPatients(patients: Patient[]) {
     if (this.particles) {
-      this.world.removeChild(this.particles.container)
+      this.particleGroup.removeChildren()
       this.particles.destroy()
+      this.trails?.destroy()
       this.particles = null
+      this.trails = null
     }
     this.table = null
     this.frame = null
@@ -141,17 +179,10 @@ export class TrialScene {
     this.offsetX = new Float32Array(n)
     this.offsetY = new Float32Array(n)
     this.particles = new ParticleLayer(this.glowTexture, n)
-    this.particles.container.filters = [
-      new AdvancedBloomFilter({
-        threshold: 0.3,
-        bloomScale: 0.85,
-        brightness: 0.95,
-        blur: 6,
-        quality: 5,
-      }),
-    ]
-    this.world.addChild(this.particles.container)
-    this.world.addChild(this.selection)
+    this.trails = new TrailLayer(this.glowTexture, TRAIL_CAPACITY)
+    // Trails and particles share one bloom pass.
+    this.particleGroup.addChild(this.trails.container, this.particles.container)
+    this.minimap.setPopulation(n)
     this.renderedWeek = -1
     this.gridWeek = -1
     this.emphasisDirty = true
@@ -163,15 +194,19 @@ export class TrialScene {
     const dt = Math.min(ticker.deltaMS, 100) / 1000
     this.time += dt
     const vp = this.viewport
-    this.starfield.update(this.time, vp.left * vp.scale.x, vp.top * vp.scale.y)
+    if (!useAppStore.getState().reducedMotion) {
+      this.starfield.update(this.time, vp.left * vp.scale.x, vp.top * vp.scale.y)
+    }
     this.advancePlayback(dt)
 
     const { table, frame, particles } = this
     if (!table || !frame || !particles) return
     const state = useAppStore.getState()
 
+    const prevWeek = this.renderedWeek
     if (state.week !== this.renderedWeek) {
       computeFrame(table, state.week, frame)
+      this.bursts.detect(table, frame, prevWeek, state.week)
       this.updateStats(state.week - this.renderedWeek)
       // Status filters depend on the stage at this week.
       if (state.filters.statuses.length > 0) this.emphasisDirty = true
@@ -180,9 +215,22 @@ export class TrialScene {
     if (this.emphasisDirty) this.retargetEmphasis(state)
     this.blendEmphasis()
     this.decayActivity(dt)
-    this.updateDrift()
+    this.updateDrift(state.reducedMotion)
     particles.apply(frame, this.emphasis, this.offsetX, this.offsetY, this.hovered)
+    const weekDelta = prevWeek < 0 ? 0 : state.week - prevWeek
+    if (this.trails && !state.reducedMotion)
+      this.trails.update(table, frame, state.week, weekDelta, dt, this.emphasis)
+    this.bursts.enabled = !state.reducedMotion
+    this.bursts.update(dt)
     this.updateSelection(state.selectedId)
+    if (this.minimap.visible && this.frameCount++ % 3 === 0) this.minimap.update(frame)
+  }
+
+  /** Bottom-left, beside the timeline (CSS reserves the gutter at the same breakpoint). */
+  private placeMinimap(w: number, h: number) {
+    const { height } = this.minimap.size
+    this.minimap.visible = w > 1100 && h >= 700
+    this.minimap.position.set(24, h - 24 - height)
   }
 
   /** The playback clock lives in the Pixi ticker, not in React. */
@@ -195,9 +243,14 @@ export class TrialScene {
   }
 
   /** Gentle swarm drift for particles resting in a zone. */
-  private updateDrift() {
+  private updateDrift(reduced: boolean) {
     const { table, frame } = this
     if (!table || !frame) return
+    if (reduced) {
+      this.offsetX.fill(0)
+      this.offsetY.fill(0)
+      return
+    }
     const t = this.time
     for (let i = 0; i < table.count; i++) {
       const phase = table.r3[i] * 6.283
@@ -219,7 +272,8 @@ export class TrialScene {
     computeEmphasis(this.filterMask, active, state.selectedId, this.emphasisTo)
     gsap.killTweensOf(this.emphasisMix)
     this.emphasisMix.value = 0
-    gsap.to(this.emphasisMix, { value: 1, duration: durations.slow, ease: easings.gsapOut })
+    if (state.reducedMotion) this.emphasisMix.value = 1
+    else gsap.to(this.emphasisMix, { value: 1, duration: durations.slow, ease: easings.gsapOut })
     this.gridWeek = -1
   }
 
@@ -279,7 +333,9 @@ export class TrialScene {
     const scale = Math.max(this.viewport.scale.x, this.camera.fitScale * 2.6)
     // Offset so the particle isn't hidden behind the patient card on wide screens.
     const offset = this.viewport.screenWidth > 900 ? 180 / scale : 0
-    this.camera.flyTo(frame.x[id] + offset, frame.y[id], scale)
+    if (useAppStore.getState().reducedMotion)
+      this.camera.jumpTo(frame.x[id] + offset, frame.y[id], scale)
+    else this.camera.flyTo(frame.x[id] + offset, frame.y[id], scale)
   }
 
   private updateSelection(selectedId: number | null) {
@@ -360,16 +416,19 @@ export class TrialScene {
   private onResize = (w: number, h: number) => {
     this.viewport.resize(w, h, WORLD.width, WORLD.height)
     this.starfield.resize(w, h)
+    this.placeMinimap(w, h)
     this.camera.home()
   }
 
   destroy() {
     this.unsubscribers.forEach((u) => u())
+    this.intro?.finish()
     gsap.killTweensOf(this.emphasisMix)
     this.camera.destroy()
     this.app.ticker.remove(this.onTick)
     this.app.renderer.off('resize', this.onResize)
     this.particles?.destroy()
+    this.trails?.destroy()
     this.viewport.destroy({ children: true })
     this.starfield.destroy({ children: true })
     this.glowTexture.destroy(true)

@@ -1,0 +1,88 @@
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  max-height: 72vh;
+  padding: 4px 0 var(--s2);
+  border-radius: var(--r-xl) var(--r-xl) var(--r-lg) var(--r-lg);
+  pointer-events: auto;
+  touch-action: none;
+  background: linear-gradient(180deg, rgb(18 25 46 / 92%), rgb(9 13 26 / 94%));
+}
+
+/* The timeline is already a glass card; inside the sheet it sits flush. */
+.sheet > div:nth-child(2) {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.handle {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 18px;
+  border: 0;
+  background: none;
+  cursor: grab;
+}
+
+.handle span {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 22%);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.body > aside {
+  width: auto;
+  margin: 0 var(--s2);
+  max-height: none;
+}
+
+.kpis {
+  overflow-x: auto;
+  padding: 2px var(--s2) 4px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.kpis > div > * {
+  scroll-snap-align: start;
+  flex: none;
+  width: 140px;
+}
+
+/* Swipeable chart cards. */
+.cards {
+  display: flex;
+  gap: 12px;
+  padding: 0 var(--s2) 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.card {
+  flex: none;
+  width: calc(100% - 40px);
+  padding: var(--s2);
+  border-radius: var(--r-lg);
+  scroll-snap-align: center;
+  background: rgb(255 255 255 / 3%);
+  border: 1px solid var(--glass-border);
+}

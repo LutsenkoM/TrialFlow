@@ -30,3 +30,11 @@
 - Discontinuation reasons are shown as stacked bars per arm (share of randomized) rather than a donut — easier to compare arms side by side.
 - Non-matching particles dim and shrink rather than blur: a per-particle blur isn't possible inside one batched ParticleContainer without splitting it.
 - The patient card replaces the insights panel while a patient is selected (one right-hand column, less clutter).
+- Motion trails are "ghosts": the same particle evaluated a few hundredths of a week in the past via the pure model (5 per travelling particle, capped at 6k). Spacing follows playback speed and direction; trails fade out when time stops. No render-texture feedback pass.
+- Event bursts: rate-limited ripples at the randomization node, upward glow on completion arrival, dim red spark on discontinuation arrival; fixed sprite pool.
+- Timeline jumps (click, arrow keys, Home/End) glide via a GSAP tween of the week; dragging follows the pointer 1:1.
+- Intro (~2.6 s): title card (letter-by-letter blur reveal) over a masked left→right draw-in of the zones and a GSAP camera ease-out, then autoplay from week 0. Skipped by click/key, deep links (`?week`, `?select`, `?nointro`) and reduced motion.
+- Data is generated in a module Web Worker (~40 ms for 15k in Node; keeps the intro smooth on slower devices), with a main-thread fallback.
+- Reduced motion: no intro, no drift/starfield motion, no trails/bursts, instant camera and filter transitions, count-ups jump, CSS durations zero.
+- Phones (≤720 px): header + icon filter button on top; a draggable bottom sheet holds the timeline, KPI cards and horizontally swipeable chart cards (scroll-snap); the patient card opens inside the sheet. Minimap and zoom buttons are desktop-only (pinch on touch).
+- Minimap is a Pixi overlay in screen space (sampled every 5th particle, redrawn every 3rd frame); CSS reserves a matching gutter beside the timeline.

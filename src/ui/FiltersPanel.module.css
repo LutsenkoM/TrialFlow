@@ -39,7 +39,11 @@
   max-height: calc(100vh - 340px);
   padding: var(--s2) var(--s3) var(--s3);
   overflow: hidden auto;
-  background: linear-gradient(180deg, rgb(18 25 46 / 90%), rgb(9 13 26 / 88%));
+}
+
+/* Doubled class beats the shared glass background so the panel reads over busy content. */
+.panel.panel {
+  background: linear-gradient(180deg, rgb(18 25 46 / 97%), rgb(9 13 26 / 97%));
 }
 
 .head {
@@ -205,4 +209,20 @@
 .reset:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+@media (max-width: 720px) {
+  .toggle {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .toggleLabel {
+    display: none;
+  }
+  .badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+  }
 }

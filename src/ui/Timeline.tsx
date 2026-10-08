@@ -7,6 +7,7 @@ import { useAppStore, type Speed } from '../store/appStore'
 import { springs } from '../theme'
 import glass from './glass.module.css'
 import styles from './Timeline.module.css'
+import { cancelJump, jumpToWeek, stepWeek, togglePlay } from './timeControl'
 import { useStoreEffect } from './useStoreRef'
 
 const SPEEDS: Speed[] = [0.5, 1, 2, 4]
@@ -18,7 +19,6 @@ export function Timeline() {
   const playing = useAppStore((s) => s.playing)
   const speed = useAppStore((s) => s.speed)
   const ended = useAppStore((s) => s.week >= WEEKS)
-  const togglePlaying = useAppStore((s) => s.togglePlaying)
   const setSpeed = useAppStore((s) => s.setSpeed)
 
   const density = useMemo(() => visitDensity(patients), [patients])
@@ -50,15 +50,20 @@ export function Timeline() {
     return ((clientX - rect.left) / rect.width) * WEEKS
   }
 
+  const dragging = useRef(false)
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     const s = useAppStore.getState()
     wasPlaying.current = s.playing
+    dragging.current = false
     s.setPlaying(false)
-    s.setWeek(weekFromPointer(e.clientX))
+    // A click glides to the target; dragging then follows the pointer 1:1.
+    jumpToWeek(weekFromPointer(e.clientX))
   }
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    if (!dragging.current) cancelJump()
+    dragging.current = true
     useAppStore.getState().setWeek(weekFromPointer(e.clientX))
   }
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
@@ -66,12 +71,11 @@ export function Timeline() {
     if (wasPlaying.current) useAppStore.getState().setPlaying(true)
   }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const s = useAppStore.getState()
     const step = e.shiftKey ? 4 : 1
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') s.setWeek(Math.floor(s.week) + step)
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') s.setWeek(Math.ceil(s.week) - step)
-    else if (e.key === 'Home') s.setWeek(0)
-    else if (e.key === 'End') s.setWeek(WEEKS)
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') stepWeek(step)
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') stepWeek(-step)
+    else if (e.key === 'Home') jumpToWeek(0)
+    else if (e.key === 'End') jumpToWeek(WEEKS)
     else return
     e.preventDefault()
     e.stopPropagation()
@@ -82,7 +86,7 @@ export function Timeline() {
       <motion.button
         type="button"
         className={styles.play}
-        onClick={togglePlaying}
+        onClick={togglePlay}
         aria-label={playing ? 'Pause' : ended ? 'Replay from week 0' : 'Play'}
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.92 }}

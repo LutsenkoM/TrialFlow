@@ -81,12 +81,13 @@ export function FiltersPanel({ matched, total, active }: Props) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls="filters-panel"
+        aria-label="Filters"
         whileHover={{ y: -1 }}
         whileTap={{ scale: 0.97 }}
         transition={springs.press}
       >
         <SlidersHorizontal size={15} />
-        Filters
+        <span className={styles.toggleLabel}>Filters</span>
         {activeCount > 0 && <span className={`num ${styles.badge}`}>{activeCount}</span>}
       </motion.button>
 

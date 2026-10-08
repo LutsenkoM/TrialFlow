@@ -72,22 +72,31 @@ function laneSlot(arm: number, progress: number, r0: number, r1: number) {
   sy = lane.y + (r0 * 2 - 1) * lane.halfWidth
 }
 
-/** Writes particle i's state at `week` into the frame buffers. Pure w.r.t. inputs. */
-export function computeParticle(t: PatientTable, i: number, week: number, out: FrameBuffers) {
+/**
+ * Writes particle i's state at `week` into `out` at index `o` (defaults to i; trails write
+ * ghosts into a separate buffer). Pure w.r.t. inputs.
+ */
+export function computeParticle(
+  t: PatientTable,
+  i: number,
+  week: number,
+  out: FrameBuffers,
+  o = i,
+) {
   const scr = t.screenWeek[i]
   const r0 = t.r0[i]
   const r1 = t.r1[i]
   const baseScale = 0.75 + t.r2[i] * 0.5
-  out.moving[i] = 0
-  out.transition[i] = 1
+  out.moving[o] = 0
+  out.transition[o] = 1
 
   if (week < scr) {
-    out.stage[i] = STAGE.hidden
-    out.alpha[i] = 0
-    out.x[i] = layout.source.x
-    out.y[i] = layout.source.y + (r1 - 0.5) * layout.source.spread
-    out.scale[i] = baseScale
-    out.tint[i] = colors.neutral
+    out.stage[o] = STAGE.hidden
+    out.alpha[o] = 0
+    out.x[o] = layout.source.x
+    out.y[o] = layout.source.y + (r1 - 0.5) * layout.source.spread
+    out.scale[o] = baseScale
+    out.tint[o] = colors.neutral
     return
   }
 
@@ -97,45 +106,45 @@ export function computeParticle(t: PatientTable, i: number, week: number, out: F
   const screenY = sy
 
   if (week < dec) {
-    out.stage[i] = STAGE.screening
-    out.tint[i] = colors.neutral
-    out.scale[i] = baseScale
+    out.stage[o] = STAGE.screening
+    out.tint[o] = colors.neutral
+    out.scale[o] = baseScale
     const k = (week - scr) / TRANSITION.enter
     if (k < 1) {
       const e = easeInOutCubic(k)
       const fromX = layout.source.x
       const fromY = layout.source.y + (r1 - 0.5) * layout.source.spread
-      out.x[i] = quad(fromX, screenX - 120, screenX, e)
-      out.y[i] = quad(fromY, fromY, screenY, e)
-      out.alpha[i] = 0.25 + 0.6 * clamp01(k * 2)
-      out.moving[i] = 1
-      out.transition[i] = k
+      out.x[o] = quad(fromX, screenX - 120, screenX, e)
+      out.y[o] = quad(fromY, fromY, screenY, e)
+      out.alpha[o] = 0.25 + 0.6 * clamp01(k * 2)
+      out.moving[o] = 1
+      out.transition[o] = k
     } else {
-      out.x[i] = screenX
-      out.y[i] = screenY
-      out.alpha[i] = 0.85
+      out.x[o] = screenX
+      out.y[o] = screenY
+      out.alpha[o] = 0.85
     }
     return
   }
 
   const arm = t.arm[i]
   if (arm < 0) {
-    out.stage[i] = STAGE.screenFailed
-    out.tint[i] = colors.screenFail
-    out.scale[i] = baseScale * 0.85
+    out.stage[o] = STAGE.screenFailed
+    out.tint[o] = colors.screenFail
+    out.scale[o] = baseScale * 0.85
     discSlot(layout.screenFail, r0, r1)
     const k = (week - dec) / TRANSITION.fail
     if (k < 1) {
       const e = easeInOutCubic(k)
-      out.x[i] = quad(screenX, screenX + 40, sx, e)
-      out.y[i] = quad(screenY, (screenY + sy) / 2, sy, e)
-      out.alpha[i] = 0.85 - 0.45 * e
-      out.moving[i] = 1
-      out.transition[i] = k
+      out.x[o] = quad(screenX, screenX + 40, sx, e)
+      out.y[o] = quad(screenY, (screenY + sy) / 2, sy, e)
+      out.alpha[o] = 0.85 - 0.45 * e
+      out.moving[o] = 1
+      out.transition[o] = k
     } else {
-      out.x[i] = sx
-      out.y[i] = sy
-      out.alpha[i] = 0.4
+      out.x[o] = sx
+      out.y[o] = sy
+      out.alpha[o] = 0.4
     }
     return
   }
@@ -144,25 +153,25 @@ export function computeParticle(t: PatientTable, i: number, week: number, out: F
   const armColor = ARM_COLORS[arm]
 
   if (week < end) {
-    out.stage[i] = STAGE.treatment
-    out.scale[i] = baseScale
+    out.stage[o] = STAGE.treatment
+    out.scale[o] = baseScale
     const progress = clamp01((week - dec) / TREATMENT_CAL)
     laneSlot(arm, progress, r0, r1)
     const k = (week - dec) / TRANSITION.randomize
     if (k < 1) {
       const e = easeInOutCubic(k)
       const rn = layout.randomization
-      out.x[i] = quad(screenX, rn.x, sx, e)
-      out.y[i] = quad(screenY, rn.y, sy, e)
-      out.tint[i] = lerpColor(colors.neutral, armColor, clamp01(k * 1.6))
-      out.alpha[i] = 0.85 - 0.25 * e
-      out.moving[i] = 1
-      out.transition[i] = k
+      out.x[o] = quad(screenX, rn.x, sx, e)
+      out.y[o] = quad(screenY, rn.y, sy, e)
+      out.tint[o] = lerpColor(colors.neutral, armColor, clamp01(k * 1.6))
+      out.alpha[o] = 0.85 - 0.25 * e
+      out.moving[o] = 1
+      out.transition[o] = k
     } else {
-      out.x[i] = sx
-      out.y[i] = sy
-      out.tint[i] = armColor
-      out.alpha[i] = 0.6
+      out.x[o] = sx
+      out.y[o] = sy
+      out.tint[o] = armColor
+      out.alpha[o] = 0.6
     }
     return
   }
@@ -175,41 +184,41 @@ export function computeParticle(t: PatientTable, i: number, week: number, out: F
   const k = (week - end) / TRANSITION.sink
 
   if (outcome === 0) {
-    out.stage[i] = STAGE.completed
-    out.tint[i] = armColor
-    out.scale[i] = baseScale
+    out.stage[o] = STAGE.completed
+    out.tint[o] = armColor
+    out.scale[o] = baseScale
     discSlot(COMPLETED[arm], r0, r1)
     if (k < 1) {
       const e = easeInOutCubic(k)
-      out.x[i] = quad(fromX, sx - 60, sx, e)
-      out.y[i] = quad(fromY, fromY, sy, e)
-      out.moving[i] = 1
-      out.transition[i] = k
+      out.x[o] = quad(fromX, sx - 60, sx, e)
+      out.y[o] = quad(fromY, fromY, sy, e)
+      out.moving[o] = 1
+      out.transition[o] = k
     } else {
-      out.x[i] = sx
-      out.y[i] = sy
+      out.x[o] = sx
+      out.y[o] = sy
     }
-    out.alpha[i] = 0.7
+    out.alpha[o] = 0.7
     return
   }
 
-  out.stage[i] = STAGE.discontinued
-  out.scale[i] = baseScale * 0.85
+  out.stage[o] = STAGE.discontinued
+  out.scale[o] = baseScale * 0.85
   discSlot(POOLS[outcome - 1], r0, r1)
   if (k < 1) {
     const e = easeInOutCubic(k)
     // Fall: drop vertically first, then settle into the reason pool.
-    out.x[i] = quad(fromX, fromX, sx, e)
-    out.y[i] = quad(fromY, sy, sy, e)
-    out.tint[i] = lerpColor(armColor, colors.reasons.lack_of_efficacy, e * 0.35)
-    out.alpha[i] = 0.6 - 0.05 * e
-    out.moving[i] = 1
-    out.transition[i] = k
+    out.x[o] = quad(fromX, fromX, sx, e)
+    out.y[o] = quad(fromY, sy, sy, e)
+    out.tint[o] = lerpColor(armColor, colors.reasons.lack_of_efficacy, e * 0.35)
+    out.alpha[o] = 0.6 - 0.05 * e
+    out.moving[o] = 1
+    out.transition[o] = k
   } else {
-    out.x[i] = sx
-    out.y[i] = sy
-    out.tint[i] = lerpColor(armColor, colors.reasons.lack_of_efficacy, 0.35)
-    out.alpha[i] = 0.55
+    out.x[o] = sx
+    out.y[o] = sy
+    out.tint[o] = lerpColor(armColor, colors.reasons.lack_of_efficacy, 0.35)
+    out.alpha[o] = 0.55
   }
 }
 
