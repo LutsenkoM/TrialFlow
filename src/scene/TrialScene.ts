@@ -89,6 +89,7 @@ export class TrialScene {
   private readonly minimap: Minimap
   private frameCount = 0
   private ribbonWeek = -1
+  private countedFilters: AppState['filters'] | null = null
   private readonly perf = new PerfMonitor()
   private trails: TrailLayer | null = null
   private particles: ParticleLayer | null = null
@@ -323,6 +324,13 @@ export class TrialScene {
     if (state.reducedMotion) this.emphasisMix.value = 1
     else gsap.to(this.emphasisMix, { value: 1, duration: durations.slow, ease: easings.gsapOut })
     this.gridWeek = -1
+    // Zone counters and ribbons describe the filtered population; refresh them when the
+    // filter set itself changes (status filters re-run this every week, counts follow anyway).
+    if (state.filters !== this.countedFilters) {
+      this.countedFilters = state.filters
+      this.ribbonWeek = -10
+      this.updateStats(0)
+    }
   }
 
   private blendEmphasis() {
@@ -419,7 +427,7 @@ export class TrialScene {
     if (!table || !frame) return
     const recycled = this.prevStats
     this.prevStats = this.stats
-    this.stats = computeFlowStats(table, frame, recycled)
+    this.stats = computeFlowStats(table, frame, recycled, this.filterMask)
     const s = this.stats
     const p = this.prevStats
 
