@@ -26,8 +26,17 @@ export class ParticleLayer {
     }
   }
 
-  /** Copies frame buffers into particles. `dimmed`/`boost` come from filters/selection. */
-  apply(frame: FrameBuffers, emphasis: Float32Array, offsetX: Float32Array, offsetY: Float32Array) {
+  /**
+   * Copies frame buffers into particles. `emphasis`: 1 normal, <1 dimmed, >1 highlighted.
+   * `hovered` gets an extra size/alpha boost.
+   */
+  apply(
+    frame: FrameBuffers,
+    emphasis: Float32Array,
+    offsetX: Float32Array,
+    offsetY: Float32Array,
+    hovered: number,
+  ) {
     const ps = this.particles
     const base = this.baseScale
     for (let i = 0; i < ps.length; i++) {
@@ -35,11 +44,20 @@ export class ParticleLayer {
       const e = emphasis[i]
       p.x = frame.x[i] + offsetX[i]
       p.y = frame.y[i] + offsetY[i]
-      const s = frame.scale[i] * base * (0.55 + 0.45 * e + (e > 1 ? 0.25 : 0))
+      let s = e >= 1 ? 1 + (e - 1) * 0.45 : 0.6 + 0.4 * e
+      let a =
+        e >= 1
+          ? frame.alpha[i] + (1 - frame.alpha[i]) * Math.min(1, e - 1)
+          : frame.alpha[i] * (0.05 + 0.95 * e)
+      if (i === hovered) {
+        s *= 1.7
+        a = 1
+      }
+      s *= frame.scale[i] * base
       p.scaleX = s
       p.scaleY = s
       p.tint = frame.tint[i]
-      p.alpha = frame.alpha[i] * (e > 1 ? 1 : 0.12 + 0.88 * e)
+      p.alpha = a
     }
   }
 

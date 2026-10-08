@@ -1,0 +1,24 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: var(--r-md);
+  pointer-events: auto;
+}
+
+.btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.btn:hover {
+  color: var(--ink);
+  background: rgb(255 255 255 / 6%);
+}

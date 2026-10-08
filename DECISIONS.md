@@ -21,3 +21,7 @@
 - Playback clock runs in the Pixi ticker and writes `week` to the store; UI that shows the week every frame (playhead, readout) subscribes imperatively and writes to the DOM, so React doesn't re-render per frame.
 - Scrubber "visit markers": a histogram of scheduled visits + screenings per half-week (where the study is busy) plus diamond milestones (first randomized, enrollment closes, first completion, last visit). Protocol visit weeks are shown as ticks on each lane in the scene.
 - Flow ribbons are linear in patient count (true Sankey). Discontinuation ribbons are per reason (pooled across arms) and drop from the bottom lane to keep the scene readable.
+- Hit-testing: uniform `SpatialGrid` (24-unit cells, counting-sort rebuild into typed arrays) rebuilt lazily only when a pointer query happens after the week/filters change.
+- Camera flights and emphasis cross-fades use GSAP tweening plain objects (camera centre/scale, a single `mix` value) rather than tweening 15k display objects.
+- A tiny `window.__trialFlow` handle (screen position of a particle) exists so the Playwright smoke test can click a real particle.
+- Deep links: `?week=`, `?select=`, `?n=` (population size) and `?debug` for screenshots and demos.

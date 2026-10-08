@@ -4,6 +4,12 @@
  */
 import { chromium } from '@playwright/test'
 
+declare global {
+  interface Window {
+    __trialFlow?: { screenPositionOf(id: number): { x: number; y: number } | null }
+  }
+}
+
 const url = process.argv[2] ?? 'http://localhost:4173/TrialFlow/'
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -48,6 +54,30 @@ await slider.focus()
 const beforeKey = await readWeek()
 await page.keyboard.press('ArrowLeft')
 check((await readWeek()) < beforeKey, 'arrow key steps backwards')
+
+// Click-to-inspect: find a visible particle on screen and click it.
+await page.waitForTimeout(500)
+const pos = await page.evaluate(() => {
+  for (let id = 0; id < 600; id++) {
+    const p = window.__trialFlow?.screenPositionOf(id)
+    if (p && p.x > 100 && p.x < 1300 && p.y > 180 && p.y < 760) return { id, ...p }
+  }
+  return null
+})
+if (pos) {
+  await page.mouse.move(pos.x, pos.y)
+  await page.waitForTimeout(200)
+  await page.mouse.click(pos.x, pos.y)
+  await page.waitForTimeout(1500)
+  const card = await page.locator('aside[aria-label^="Patient"]').count()
+  check(card === 1, 'clicking a particle opens the patient card')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+  check(
+    (await page.locator('aside[aria-label^="Patient"]').count()) === 0,
+    'Escape closes the card',
+  )
+} else check(false, 'found a particle on screen to click')
 
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join(' | ') : ''}`)
 await browser.close()

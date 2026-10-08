@@ -1,6 +1,7 @@
 import { Application, extend, useApplication } from '@pixi/react'
 import { Container } from 'pixi.js'
 import { useEffect, useRef } from 'react'
+import { setActiveScene } from './sceneApi'
 import { TrialScene } from './TrialScene'
 import styles from './SceneCanvas.module.css'
 
@@ -22,10 +23,13 @@ function SceneBridge() {
     let cancelled = false
     // Labels use web fonts; load them explicitly so Pixi measures text with the right metrics.
     void loadSceneFonts().then(() => {
-      if (!cancelled) scene = new TrialScene(app)
+      if (cancelled) return
+      scene = new TrialScene(app)
+      setActiveScene(scene)
     })
     return () => {
       cancelled = true
+      setActiveScene(null)
       scene?.destroy()
     }
   }, [app, isInitialised])

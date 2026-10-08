@@ -1,17 +1,30 @@
-import { Container, type Application, type Ticker } from 'pixi.js'
+import gsap from 'gsap'
+import {
+  Container,
+  Rectangle,
+  type Application,
+  type FederatedPointerEvent,
+  type Ticker,
+} from 'pixi.js'
 import { AdvancedBloomFilter } from 'pixi-filters'
 import { Viewport } from 'pixi-viewport'
-import { WORLD } from '../core/layout'
+import { buildFilterMask, computeEmphasis, isFilterActive } from '../core/filters'
 import { computeFlowStats, createFlowStats, sum, type FlowStats } from '../core/flowStats'
+import { WORLD } from '../core/layout'
 import { STAGE, computeFrame, createFrameBuffers, type FrameBuffers } from '../core/particleModel'
-import { advanceWeek } from '../core/playback'
 import { buildPatientTable, type PatientTable } from '../core/patientTable'
+import { advanceWeek } from '../core/playback'
+import { SpatialGrid } from '../core/spatialGrid'
+import { STUDY } from '../data/studyConfig'
 import type { Patient } from '../data/types'
-import { useAppStore } from '../store/appStore'
+import { useAppStore, type AppState } from '../store/appStore'
+import { durations, easings } from '../theme'
+import { CameraController } from './CameraController'
 import { ParticleLayer } from './ParticleLayer'
 import { RibbonsLayer } from './RibbonsLayer'
+import { SelectionLayer } from './SelectionLayer'
 import { Starfield } from './Starfield'
-import { createGlowTexture, createHaloTexture } from './textures'
+import { createGlowTexture, createHaloTexture, createRingTexture } from './textures'
 import { ZonesLayer, type ZoneKey } from './ZonesLayer'
 
 const ARM_KEYS: ZoneKey[] = ['placebo', 'low', 'high']
@@ -21,6 +34,8 @@ const REASON_KEYS: ZoneKey[] = [
   'withdrawal',
   'lost_to_follow_up',
 ]
+/** Pointer pick radius in screen pixels. */
+const PICK_RADIUS_PX = 14
 
 /**
  * Imperative Pixi scene. Owns every display object; reads app state from the zustand
@@ -28,26 +43,42 @@ const REASON_KEYS: ZoneKey[] = [
  */
 export class TrialScene {
   readonly viewport: Viewport
+  readonly camera: CameraController
+  private readonly app: Application
   private readonly starfield: Starfield
   private readonly zones: ZonesLayer
   private readonly ribbons = new RibbonsLayer()
-  private stats: FlowStats = createFlowStats()
-  private prevStats: FlowStats = createFlowStats()
-  private readonly activity = new Map<ZoneKey, number>()
   private readonly world = new Container()
   private readonly glowTexture = createGlowTexture()
   private readonly haloTexture = createHaloTexture()
+  private readonly ringTexture = createRingTexture()
+  private readonly selection: SelectionLayer
+  private readonly grid = new SpatialGrid(
+    { x: -400, y: -200, width: WORLD.width + 800, height: WORLD.height + 400 },
+    24,
+    0,
+  )
+  private readonly activity = new Map<ZoneKey, number>()
+  private readonly unsubscribers: (() => void)[] = []
+
   private particles: ParticleLayer | null = null
   private table: PatientTable | null = null
   private frame: FrameBuffers | null = null
+  private stats: FlowStats = createFlowStats()
+  private prevStats: FlowStats = createFlowStats()
+  private filterMask = new Uint8Array(0)
+  /** Emphasis shown on screen = lerp(from, to, mix); GSAP tweens `mix` on every change. */
   private emphasis = new Float32Array(0)
+  private emphasisFrom = new Float32Array(0)
+  private emphasisTo = new Float32Array(0)
+  private readonly emphasisMix = { value: 1 }
+  private emphasisDirty = true
   private offsetX = new Float32Array(0)
   private offsetY = new Float32Array(0)
   private renderedWeek = -1
+  private gridWeek = -1
   private time = 0
-  private readonly unsubscribers: (() => void)[] = []
-
-  private readonly app: Application
+  private hovered = -1
 
   constructor(app: Application) {
     this.app = app
@@ -62,24 +93,32 @@ export class TrialScene {
       worldHeight: WORLD.height,
       events: app.renderer.events,
     })
+    this.viewport.hitArea = new Rectangle(-1e5, -1e5, 2e5, 2e5)
     app.stage.addChild(this.viewport)
     this.viewport.addChild(this.world)
+    this.camera = new CameraController(this.viewport)
 
     this.zones = new ZonesLayer(this.haloTexture)
-    this.world.addChild(this.zones)
-    this.world.addChild(this.ribbons)
-    this.fitToScreen()
+    this.selection = new SelectionLayer(this.ringTexture)
+    this.world.addChild(this.zones, this.ribbons)
+    this.camera.home()
 
     app.renderer.on('resize', this.onResize)
     app.ticker.add(this.onTick)
+    this.viewport.on('pointermove', this.onPointerMove)
+    this.viewport.on('pointerleave', this.onPointerLeave)
+    this.viewport.on('clicked', this.onClicked)
 
-    const store = useAppStore
-    this.unsubscribers.push(
-      store.subscribe((s, prev) => {
-        if (s.patients !== prev.patients) this.setPatients(s.patients)
-      }),
-    )
-    this.setPatients(store.getState().patients)
+    this.unsubscribers.push(useAppStore.subscribe(this.onStoreChange))
+    this.setPatients(useAppStore.getState().patients)
+  }
+
+  // ---- store -------------------------------------------------------------
+
+  private onStoreChange = (s: AppState, prev: AppState) => {
+    if (s.patients !== prev.patients) this.setPatients(s.patients)
+    if (s.filters !== prev.filters || s.selectedId !== prev.selectedId) this.emphasisDirty = true
+    if (s.selectedId !== prev.selectedId) this.onSelectionChange(s.selectedId)
   }
 
   private setPatients(patients: Patient[]) {
@@ -88,77 +127,62 @@ export class TrialScene {
       this.particles.destroy()
       this.particles = null
     }
+    this.table = null
+    this.frame = null
     if (patients.length === 0) return
     const table = buildPatientTable(patients)
+    const n = table.count
     this.table = table
-    this.frame = createFrameBuffers(table.count)
-    this.emphasis = new Float32Array(table.count).fill(1)
-    this.offsetX = new Float32Array(table.count)
-    this.offsetY = new Float32Array(table.count)
-    this.particles = new ParticleLayer(this.glowTexture, table.count)
+    this.frame = createFrameBuffers(n)
+    this.filterMask = new Uint8Array(n).fill(1)
+    this.emphasis = new Float32Array(n).fill(1)
+    this.emphasisFrom = new Float32Array(n).fill(1)
+    this.emphasisTo = new Float32Array(n).fill(1)
+    this.offsetX = new Float32Array(n)
+    this.offsetY = new Float32Array(n)
+    this.particles = new ParticleLayer(this.glowTexture, n)
     this.particles.container.filters = [
       new AdvancedBloomFilter({
-        threshold: 0.18,
-        bloomScale: 1.1,
-        brightness: 1,
-        blur: 7,
+        threshold: 0.3,
+        bloomScale: 0.85,
+        brightness: 0.95,
+        blur: 6,
         quality: 5,
       }),
     ]
     this.world.addChild(this.particles.container)
+    this.world.addChild(this.selection)
     this.renderedWeek = -1
+    this.gridWeek = -1
+    this.emphasisDirty = true
   }
 
-  /**
-   * Default camera: whole study on landscape screens (leaving room for the header and
-   * timeline chrome), lanes-first framing on portrait phones.
-   */
-  fitToScreen() {
-    const vp = this.viewport
-    const { screenWidth: w, screenHeight: h } = vp
-    if (w / h < 0.9) {
-      vp.setZoom((h * 0.6) / WORLD.height, true)
-      vp.moveCenter(1180, WORLD.height / 2 + 30)
-      return
-    }
-    const insetTop = 40
-    const insetBottom = 140
-    const scale = Math.min(
-      w / (WORLD.width + 200),
-      (h - insetTop - insetBottom) / (WORLD.height + 40),
-    )
-    vp.setZoom(scale, true)
-    const shift = (insetBottom - insetTop) / 2 / scale
-    vp.moveCenter(WORLD.width / 2 - 40, WORLD.height / 2 + shift)
-  }
-
-  private onResize = (w: number, h: number) => {
-    this.viewport.resize(w, h, WORLD.width, WORLD.height)
-    this.starfield.resize(w, h)
-    this.fitToScreen()
-  }
+  // ---- frame loop --------------------------------------------------------
 
   private onTick = (ticker: Ticker) => {
     const dt = Math.min(ticker.deltaMS, 100) / 1000
     this.time += dt
-    this.starfield.update(
-      this.time,
-      this.viewport.left * this.viewport.scale.x,
-      this.viewport.top * this.viewport.scale.y,
-    )
+    const vp = this.viewport
+    this.starfield.update(this.time, vp.left * vp.scale.x, vp.top * vp.scale.y)
     this.advancePlayback(dt)
+
     const { table, frame, particles } = this
     if (!table || !frame || !particles) return
+    const state = useAppStore.getState()
 
-    const week = useAppStore.getState().week
-    if (week !== this.renderedWeek) {
-      computeFrame(table, week, frame)
-      this.updateStats(week - this.renderedWeek)
-      this.renderedWeek = week
+    if (state.week !== this.renderedWeek) {
+      computeFrame(table, state.week, frame)
+      this.updateStats(state.week - this.renderedWeek)
+      // Status filters depend on the stage at this week.
+      if (state.filters.statuses.length > 0) this.emphasisDirty = true
+      this.renderedWeek = state.week
     }
+    if (this.emphasisDirty) this.retargetEmphasis(state)
+    this.blendEmphasis()
     this.decayActivity(dt)
     this.updateDrift()
-    particles.apply(frame, this.emphasis, this.offsetX, this.offsetY)
+    particles.apply(frame, this.emphasis, this.offsetX, this.offsetY, this.hovered)
+    this.updateSelection(state.selectedId)
   }
 
   /** The playback clock lives in the Pixi ticker, not in React. */
@@ -183,26 +207,130 @@ export class TrialScene {
     }
   }
 
+  // ---- emphasis (filters + selection) -------------------------------------
+
+  private retargetEmphasis(state: AppState) {
+    const { table, frame } = this
+    if (!table || !frame) return
+    this.emphasisDirty = false
+    buildFilterMask(table, frame, state.filters, this.filterMask)
+    const active = isFilterActive(state.filters, STUDY.ageRange.min, STUDY.ageRange.max)
+    this.emphasisFrom.set(this.emphasis)
+    computeEmphasis(this.filterMask, active, state.selectedId, this.emphasisTo)
+    gsap.killTweensOf(this.emphasisMix)
+    this.emphasisMix.value = 0
+    gsap.to(this.emphasisMix, { value: 1, duration: durations.slow, ease: easings.gsapOut })
+    this.gridWeek = -1
+  }
+
+  private blendEmphasis() {
+    const m = this.emphasisMix.value
+    const { emphasis, emphasisFrom, emphasisTo } = this
+    if (m >= 1) {
+      emphasis.set(emphasisTo)
+      return
+    }
+    for (let i = 0; i < emphasis.length; i++)
+      emphasis[i] = emphasisFrom[i] + (emphasisTo[i] - emphasisFrom[i]) * m
+  }
+
+  // ---- picking -----------------------------------------------------------
+
+  private ensureGrid() {
+    const { table, frame } = this
+    if (!table || !frame || this.gridWeek === this.renderedWeek) return
+    const mask = this.filterMask
+    // Hidden and filtered-out particles are not pickable.
+    this.grid.rebuild(frame.x, frame.y, (i) => frame.stage[i] !== STAGE.hidden && mask[i] === 1)
+    this.gridWeek = this.renderedWeek
+  }
+
+  private pick(globalX: number, globalY: number): number {
+    if (!this.frame) return -1
+    this.ensureGrid()
+    const p = this.viewport.toWorld(globalX, globalY)
+    const radius = PICK_RADIUS_PX / this.viewport.scale.x
+    return this.grid.nearest(p.x, p.y, radius, this.frame.x, this.frame.y)
+  }
+
+  private onPointerMove = (e: FederatedPointerEvent) => {
+    if (e.pointerType === 'touch') return
+    const hit = this.pick(e.global.x, e.global.y)
+    if (hit === this.hovered) return
+    this.hovered = hit
+    this.app.canvas.style.cursor = hit >= 0 ? 'pointer' : ''
+    useAppStore.getState().hover(hit >= 0 ? hit : null)
+  }
+
+  private onPointerLeave = () => {
+    this.hovered = -1
+    this.app.canvas.style.cursor = ''
+    useAppStore.getState().hover(null)
+  }
+
+  private onClicked = (e: { screen: { x: number; y: number } }) => {
+    const hit = this.pick(e.screen.x, e.screen.y)
+    useAppStore.getState().select(hit >= 0 ? hit : null)
+  }
+
+  private onSelectionChange(id: number | null) {
+    const frame = this.frame
+    if (id === null || !frame) return
+    const scale = Math.max(this.viewport.scale.x, this.camera.fitScale * 2.6)
+    // Offset so the particle isn't hidden behind the patient card on wide screens.
+    const offset = this.viewport.screenWidth > 900 ? 180 / scale : 0
+    this.camera.flyTo(frame.x[id] + offset, frame.y[id], scale)
+  }
+
+  private updateSelection(selectedId: number | null) {
+    const frame = this.frame
+    if (!frame) return
+    const hover =
+      this.hovered >= 0 && this.hovered !== selectedId
+        ? {
+            x: frame.x[this.hovered] + this.offsetX[this.hovered],
+            y: frame.y[this.hovered] + this.offsetY[this.hovered],
+          }
+        : null
+    const sel =
+      selectedId !== null && frame.stage[selectedId] !== STAGE.hidden
+        ? {
+            x: frame.x[selectedId] + this.offsetX[selectedId],
+            y: frame.y[selectedId] + this.offsetY[selectedId],
+            tint: frame.tint[selectedId],
+          }
+        : null
+    this.selection.update(this.time, hover, sel)
+  }
+
+  screenPositionOf(id: number): { x: number; y: number } | null {
+    const frame = this.frame
+    if (!frame || id < 0 || id >= frame.x.length || frame.stage[id] === STAGE.hidden) return null
+    const p = this.viewport.toScreen(frame.x[id], frame.y[id])
+    return { x: p.x, y: p.y }
+  }
+
+  // ---- stats + zone pulses ----------------------------------------------
+
   private updateStats(deltaWeeks: number) {
     const { table, frame } = this
     if (!table || !frame) return
-    const prev = this.prevStats
+    const recycled = this.prevStats
     this.prevStats = this.stats
-    this.stats = computeFlowStats(table, frame, prev)
+    this.stats = computeFlowStats(table, frame, recycled)
     const s = this.stats
     const p = this.prevStats
 
-    const reasonTotals = [0, 1, 2, 3].map(
-      (r) => s.discontinued[0][r] + s.discontinued[1][r] + s.discontinued[2][r],
-    )
+    const reasonTotal = (st: FlowStats, r: number) =>
+      st.discontinued[0][r] + st.discontinued[1][r] + st.discontinued[2][r]
     this.zones.setCount('screening', s.inScreening)
     this.zones.setCount('screenFail', s.screenFailed)
     this.zones.setCount('completed', sum(s.completed))
     ARM_KEYS.forEach((k, i) => this.zones.setCount(k, s.active[i]))
-    REASON_KEYS.forEach((k, i) => this.zones.setCount(k, reasonTotals[i]))
+    REASON_KEYS.forEach((k, r) => this.zones.setCount(k, reasonTotal(s, r)))
     this.ribbons.draw(s, table.count)
 
-    // Zone pulses: inflow rate (patients per week, relative to population) while playing forward.
+    // Zone pulses: inflow rate (relative to population) while time moves forward.
     if (deltaWeeks > 0 && deltaWeeks < 2) {
       const rate = (now: number, before: number) => (now - before) / deltaWeeks / table.count
       this.bump('screening', rate(s.screened, p.screened) * 12)
@@ -210,10 +338,7 @@ export class TrialScene {
       this.bump('randomization', rate(sum(s.randomized), sum(p.randomized)) * 14)
       ARM_KEYS.forEach((k, a) => this.bump(k, rate(s.randomized[a], p.randomized[a]) * 40))
       this.bump('completed', rate(sum(s.completed), sum(p.completed)) * 10)
-      REASON_KEYS.forEach((k, r) => {
-        const before = p.discontinued[0][r] + p.discontinued[1][r] + p.discontinued[2][r]
-        this.bump(k, rate(reasonTotals[r], before) * 160)
-      })
+      REASON_KEYS.forEach((k, r) => this.bump(k, rate(reasonTotal(s, r), reasonTotal(p, r)) * 160))
     }
   }
 
@@ -230,15 +355,25 @@ export class TrialScene {
     }
   }
 
+  // ---- lifecycle ---------------------------------------------------------
+
+  private onResize = (w: number, h: number) => {
+    this.viewport.resize(w, h, WORLD.width, WORLD.height)
+    this.starfield.resize(w, h)
+    this.camera.home()
+  }
+
   destroy() {
     this.unsubscribers.forEach((u) => u())
+    gsap.killTweensOf(this.emphasisMix)
+    this.camera.destroy()
     this.app.ticker.remove(this.onTick)
     this.app.renderer.off('resize', this.onResize)
     this.particles?.destroy()
-    this.ribbons.destroy()
     this.viewport.destroy({ children: true })
     this.starfield.destroy({ children: true })
     this.glowTexture.destroy(true)
     this.haloTexture.destroy(true)
+    this.ringTexture.destroy(true)
   }
 }

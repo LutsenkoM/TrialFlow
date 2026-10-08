@@ -1,0 +1,184 @@
+.card {
+  position: relative;
+  width: 340px;
+  max-height: 100%;
+  overflow: hidden auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  background: linear-gradient(180deg, rgb(18 25 46 / 90%), rgb(9 13 26 / 88%));
+  backdrop-filter: blur(24px) saturate(140%);
+}
+
+.inner {
+  position: relative;
+  padding: var(--s3);
+}
+
+.accentBar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 18px var(--accent);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.code {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 4%);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: var(--s2);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.status[data-stage='discontinued'] {
+  --accent: var(--danger);
+}
+
+.status[data-stage='completed'] {
+  --accent: var(--success);
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+  margin: var(--s3) 0 var(--s2);
+}
+
+.facts dt {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.facts dd {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.journey {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: var(--s1) 0 var(--s2);
+  padding: 8px;
+  border-radius: var(--r-md);
+  background: rgb(0 0 0 / 18%);
+  border: 1px solid var(--glass-border);
+}
+
+.journeyLabel {
+  font: 8px var(--font-mono);
+  fill: var(--ink-faint);
+}
+
+.events {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 18px;
+}
+
+.events::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: linear-gradient(var(--accent), transparent);
+  opacity: 0.4;
+}
+
+.event {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.event[data-past='true'] {
+  color: var(--ink);
+}
+
+.eventDot {
+  position: absolute;
+  left: -18px;
+  top: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: var(--bg);
+  opacity: 0.4;
+  transition: all var(--dur-base) var(--ease-out);
+}
+
+.event[data-past='true'] .eventDot {
+  opacity: 1;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.event[data-type='discontinued'] .eventDot {
+  border-color: var(--danger);
+}
+
+.event[data-type='discontinued'][data-past='true'] .eventDot {
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+}
+
+.eventWeek {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
