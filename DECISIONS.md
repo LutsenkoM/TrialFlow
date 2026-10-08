@@ -38,3 +38,5 @@
 - Reduced motion: no intro, no drift/starfield motion, no trails/bursts, instant camera and filter transitions, count-ups jump, CSS durations zero.
 - Phones (≤720 px): header + icon filter button on top; a draggable bottom sheet holds the timeline, KPI cards and horizontally swipeable chart cards (scroll-snap); the patient card opens inside the sheet. Minimap and zoom buttons are desktop-only (pinch on touch).
 - Minimap is a Pixi overlay in screen space (sampled every 5th particle, redrawn every 3rd frame); CSS reserves a matching gutter beside the timeline.
+- Quality levels toggle bloom, trail ghosts, starfield and bursts; the "particle count" lever applies to ambient/trail particles, never to patients (the data stays complete). Population size (8k / 15k) is a separate switch in the F overlay.
+- Benchmarks run in headless Chromium with ANGLE/Metal (real GPU) and CDP CPU throttling to approximate a slower laptop; see PERFORMANCE.md.

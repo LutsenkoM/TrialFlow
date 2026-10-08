@@ -11,13 +11,19 @@ import { Viewport } from 'pixi-viewport'
 import { buildFilterMask, computeEmphasis, isFilterActive } from '../core/filters'
 import { computeFlowStats, createFlowStats, sum, type FlowStats } from '../core/flowStats'
 import { WORLD } from '../core/layout'
-import { STAGE, computeFrame, createFrameBuffers, type FrameBuffers } from '../core/particleModel'
+import {
+  STAGE,
+  computeFrameIncremental,
+  createFrameBuffers,
+  type FrameBuffers,
+} from '../core/particleModel'
 import { getPatientTable, type PatientTable } from '../core/patientTable'
 import { advanceWeek } from '../core/playback'
+import { PerfMonitor, type PerfSnapshot } from '../core/perfMonitor'
 import { SpatialGrid } from '../core/spatialGrid'
 import { STUDY } from '../data/studyConfig'
 import type { Patient } from '../data/types'
-import { useAppStore, type AppState } from '../store/appStore'
+import { useAppStore, type AppState, type Quality } from '../store/appStore'
 import { durations, easings } from '../theme'
 import { CameraController } from './CameraController'
 import { IntroDirector } from './IntroDirector'
@@ -39,7 +45,11 @@ const REASON_KEYS: ZoneKey[] = [
   'lost_to_follow_up',
 ]
 /** Max ghost particles for motion trails (5 per travelling particle). */
-const TRAIL_CAPACITY = 6000
+const TRAIL_CAPACITY: Record<Quality, number> = { high: 6000, medium: 2500, low: 0 }
+const TAU = Math.PI * 2
+const SIN_STEPS = 1024
+const SIN_MASK = SIN_STEPS - 1
+const SIN = Float32Array.from({ length: SIN_STEPS }, (_, k) => Math.sin((k / SIN_STEPS) * TAU))
 /** Pointer pick radius in screen pixels. */
 const PICK_RADIUS_PX = 14
 
@@ -78,6 +88,8 @@ export class TrialScene {
   private readonly bursts: BurstLayer
   private readonly minimap: Minimap
   private frameCount = 0
+  private ribbonWeek = -1
+  private readonly perf = new PerfMonitor()
   private trails: TrailLayer | null = null
   private particles: ParticleLayer | null = null
   private table: PatientTable | null = null
@@ -151,6 +163,7 @@ export class TrialScene {
     if (s.patients !== prev.patients) this.setPatients(s.patients)
     if (s.filters !== prev.filters || s.selectedId !== prev.selectedId) this.emphasisDirty = true
     if (s.selectedId !== prev.selectedId) this.onSelectionChange(s.selectedId)
+    if (s.quality !== prev.quality) this.applyQuality(s.quality)
     if (!s.intro && prev.intro && this.intro) {
       this.intro.finish()
       this.intro = null
@@ -179,9 +192,10 @@ export class TrialScene {
     this.offsetX = new Float32Array(n)
     this.offsetY = new Float32Array(n)
     this.particles = new ParticleLayer(this.glowTexture, n)
-    this.trails = new TrailLayer(this.glowTexture, TRAIL_CAPACITY)
+    this.trails = new TrailLayer(this.glowTexture, TRAIL_CAPACITY[useAppStore.getState().quality])
     // Trails and particles share one bloom pass.
     this.particleGroup.addChild(this.trails.container, this.particles.container)
+    this.applyQuality(useAppStore.getState().quality)
     this.minimap.setPopulation(n)
     this.renderedWeek = -1
     this.gridWeek = -1
@@ -191,6 +205,32 @@ export class TrialScene {
   // ---- frame loop --------------------------------------------------------
 
   private onTick = (ticker: Ticker) => {
+    const t0 = performance.now()
+    this.step(ticker)
+    this.perf.record(ticker.deltaMS, performance.now() - t0)
+    const state = useAppStore.getState()
+    if (state.autoQuality && !state.intro && document.visibilityState === 'visible') {
+      const next = this.perf.autoDegrade(state.quality, ticker.deltaMS / 1000)
+      if (next) state.setQuality(next, true)
+    }
+  }
+
+  perfSnapshot(): PerfSnapshot & { particles: number } {
+    return { ...this.perf.snapshot(), particles: this.table?.count ?? 0 }
+  }
+
+  /** High: full bloom + trails + starfield. Medium: lighter bloom, fewer trails. Low: no bloom/trails/stars. */
+  private applyQuality(q: Quality) {
+    this.particleGroup.filters = q === 'low' ? [] : [this.bloom]
+    this.bloom.quality = q === 'high' ? 5 : 3
+    this.bloom.blur = q === 'high' ? 6 : 4
+    this.trails?.setCapacity(TRAIL_CAPACITY[q])
+    this.starfield.visible = q !== 'low'
+    this.bursts.visible = q !== 'low'
+    this.perf.reset()
+  }
+
+  private step(ticker: Ticker) {
     const dt = Math.min(ticker.deltaMS, 100) / 1000
     this.time += dt
     const vp = this.viewport
@@ -205,7 +245,7 @@ export class TrialScene {
 
     const prevWeek = this.renderedWeek
     if (state.week !== this.renderedWeek) {
-      computeFrame(table, state.week, frame)
+      computeFrameIncremental(table, this.renderedWeek, state.week, frame)
       this.bursts.detect(table, frame, prevWeek, state.week)
       this.updateStats(state.week - this.renderedWeek)
       // Status filters depend on the stage at this week.
@@ -244,19 +284,27 @@ export class TrialScene {
 
   /** Gentle swarm drift for particles resting in a zone. */
   private updateDrift(reduced: boolean) {
-    const { table, frame } = this
+    const { table, frame, offsetX, offsetY } = this
     if (!table || !frame) return
     if (reduced) {
-      this.offsetX.fill(0)
-      this.offsetY.fill(0)
+      offsetX.fill(0)
+      offsetY.fill(0)
       return
     }
-    const t = this.time
+    // Sine lookup table instead of 30k Math.sin/cos calls per frame.
+    const ax = (this.time * 0.7 * SIN_STEPS) / TAU
+    const ay = (this.time * 0.53 * SIN_STEPS) / TAU
     for (let i = 0; i < table.count; i++) {
-      const phase = table.r3[i] * 6.283
       const amp = frame.moving[i] ? 0 : frame.stage[i] === STAGE.treatment ? 1.6 : 3.2
-      this.offsetX[i] = Math.sin(t * 0.7 + phase) * amp
-      this.offsetY[i] = Math.cos(t * 0.53 + phase * 1.3) * amp
+      if (amp === 0) {
+        offsetX[i] = 0
+        offsetY[i] = 0
+        continue
+      }
+      const phase = table.r3[i] * SIN_STEPS
+      offsetX[i] = SIN[(ax + phase) & SIN_MASK] * amp
+      // cos(x) = sin(x + π/2)
+      offsetY[i] = SIN[(ay + phase * 1.3 + SIN_STEPS / 4) & SIN_MASK] * amp
     }
   }
 
@@ -341,22 +389,20 @@ export class TrialScene {
   private updateSelection(selectedId: number | null) {
     const frame = this.frame
     if (!frame) return
-    const hover =
-      this.hovered >= 0 && this.hovered !== selectedId
-        ? {
-            x: frame.x[this.hovered] + this.offsetX[this.hovered],
-            y: frame.y[this.hovered] + this.offsetY[this.hovered],
-          }
-        : null
-    const sel =
-      selectedId !== null && frame.stage[selectedId] !== STAGE.hidden
-        ? {
-            x: frame.x[selectedId] + this.offsetX[selectedId],
-            y: frame.y[selectedId] + this.offsetY[selectedId],
-            tint: frame.tint[selectedId],
-          }
-        : null
-    this.selection.update(this.time, hover, sel)
+    const h = this.hovered
+    const showHover = h >= 0 && h !== selectedId
+    const showSel = selectedId !== null && frame.stage[selectedId] !== STAGE.hidden
+    const id = selectedId ?? 0
+    this.selection.update(
+      this.time,
+      showHover,
+      showHover ? frame.x[h] + this.offsetX[h] : 0,
+      showHover ? frame.y[h] + this.offsetY[h] : 0,
+      showSel,
+      showSel ? frame.x[id] + this.offsetX[id] : 0,
+      showSel ? frame.y[id] + this.offsetY[id] : 0,
+      showSel ? frame.tint[id] : 0,
+    )
   }
 
   screenPositionOf(id: number): { x: number; y: number } | null {
@@ -384,7 +430,13 @@ export class TrialScene {
     this.zones.setCount('completed', sum(s.completed))
     ARM_KEYS.forEach((k, i) => this.zones.setCount(k, s.active[i]))
     REASON_KEYS.forEach((k, r) => this.zones.setCount(k, reasonTotal(s, r)))
-    this.ribbons.draw(s, table.count)
+    // Ribbon geometry is rebuilt at most every 0.1 week while playing (it grows slowly);
+    // scrubbing redraws immediately.
+    const week = useAppStore.getState().week
+    if (!useAppStore.getState().playing || Math.abs(week - this.ribbonWeek) >= 0.1) {
+      this.ribbons.draw(s, table.count)
+      this.ribbonWeek = week
+    }
 
     // Zone pulses: inflow rate (relative to population) while time moves forward.
     if (deltaWeeks > 0 && deltaWeeks < 2) {
@@ -404,11 +456,12 @@ export class TrialScene {
   }
 
   private decayActivity(dt: number) {
-    for (const [key, level] of this.activity) {
+    // forEach avoids allocating [key, value] entry arrays every frame.
+    this.activity.forEach((level, key, map) => {
       const next = level * Math.exp(-dt * 2.2)
-      this.activity.set(key, next)
+      map.set(key, next)
       this.zones.setActivity(key, next)
-    }
+    })
   }
 
   // ---- lifecycle ---------------------------------------------------------

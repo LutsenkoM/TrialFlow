@@ -13,6 +13,7 @@ export const sceneApi = {
   resetView: () => active?.camera.home(true),
   /** Screen position of a particle (used by the smoke test). */
   screenPositionOf: (id: number) => active?.screenPositionOf(id) ?? null,
+  perf: () => active?.perfSnapshot() ?? null,
 }
 
 declare global {

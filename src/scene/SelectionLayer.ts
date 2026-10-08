@@ -23,25 +23,30 @@ export class SelectionLayer extends Container {
     this.selectRing2 = make(44, 0.5)
   }
 
+  /** Scalar arguments (no per-frame objects). */
   update(
     time: number,
-    hover: { x: number; y: number } | null,
-    selected: { x: number; y: number; tint: number } | null,
+    showHover: boolean,
+    hx: number,
+    hy: number,
+    showSelected: boolean,
+    sx: number,
+    sy: number,
+    tint: number,
   ) {
-    this.hoverRing.visible = hover !== null
-    if (hover) this.hoverRing.position.set(hover.x, hover.y)
+    this.hoverRing.visible = showHover
+    if (showHover) this.hoverRing.position.set(hx, hy)
 
-    const visible = selected !== null
-    this.selectRing.visible = visible
-    this.selectRing2.visible = visible
-    if (!selected) return
+    this.selectRing.visible = showSelected
+    this.selectRing2.visible = showSelected
+    if (!showSelected) return
     const pulse = (time * 0.9) % 1
-    this.selectRing.position.set(selected.x, selected.y)
-    this.selectRing.tint = selected.tint
+    this.selectRing.position.set(sx, sy)
+    this.selectRing.tint = tint
     this.selectRing.scale.set((44 / 128) * (1 + Math.sin(time * 3) * 0.06))
     // Expanding ripple.
-    this.selectRing2.position.set(selected.x, selected.y)
-    this.selectRing2.tint = selected.tint
+    this.selectRing2.position.set(sx, sy)
+    this.selectRing2.tint = tint
     this.selectRing2.scale.set((44 / 128) * (1 + pulse * 1.6))
     this.selectRing2.alpha = 0.55 * (1 - pulse)
   }

@@ -2,6 +2,7 @@ import { Particle, ParticleContainer, Rectangle, type Texture } from 'pixi.js'
 import { WORLD } from '../core/layout'
 import { computeParticle, createFrameBuffers, type FrameBuffers } from '../core/particleModel'
 import type { PatientTable } from '../core/patientTable'
+import { bgr } from './ParticleLayer'
 
 const GHOSTS = 5
 const PARTICLE_SIZE = 13
@@ -81,17 +82,18 @@ export class TrailLayer {
           const fade = 1 - k / (GHOSTS + 1)
           p.x = g.x[0]
           p.y = g.y[0]
-          p.tint = frame.tint[i]
-          p.alpha = g.alpha[0] * fade * 0.42 * this.strength
+          const a = g.alpha[0] * fade * 0.42 * this.strength
+          p.color = bgr(frame.tint[i]) + ((Math.min(1, a) * 255) << 24)
           const s = g.scale[0] * this.baseScale * (0.55 + 0.45 * fade)
           p.scaleX = s
           p.scaleY = s
         }
       }
     }
+    // Hide the rest of the pool (stop at the first already-hidden ghost).
     for (let j = used; j < pool.length; j++) {
-      if (pool[j].alpha === 0) break
-      pool[j].alpha = 0
+      if (pool[j].color >>> 24 === 0) break
+      pool[j].color = 0
     }
   }
 

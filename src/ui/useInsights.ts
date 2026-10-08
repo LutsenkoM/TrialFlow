@@ -6,8 +6,15 @@ import { getPatientTable } from '../core/patientTable'
 import { STUDY } from '../data/studyConfig'
 import { useAppStore } from '../store/appStore'
 
-/** Week quantised to half-weeks so charts update a few times per second, not every frame. */
-export const useCoarseWeek = () => useAppStore((s) => Math.round(s.week * 2) / 2)
+/**
+ * Week quantised so charts update ~2–3 times per second regardless of playback speed
+ * (half-weeks at 1×, two weeks at 4×), never every frame.
+ */
+export const useCoarseWeek = () =>
+  useAppStore((s) => {
+    const step = s.playing ? 0.5 * s.speed : 0.5
+    return Math.min(52, Math.round(s.week / step) * step)
+  })
 
 /** Filter-aware insight data shared by KPI cards and charts. */
 export function useInsights() {

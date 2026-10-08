@@ -3,7 +3,13 @@ import { generatePatients } from '../data/generator'
 import { getPatientStateAt } from '../data/patientState'
 import type { Stage } from '../data/types'
 import { buildPatientTable } from './patientTable'
-import { STAGE, computeFrame, computeStages, createFrameBuffers } from './particleModel'
+import {
+  STAGE,
+  computeFrame,
+  computeFrameIncremental,
+  computeStages,
+  createFrameBuffers,
+} from './particleModel'
 
 const patients = generatePatients({ patientCount: 2000 })
 const table = buildPatientTable(patients)
@@ -58,6 +64,21 @@ describe('particleModel', () => {
       computeFrame(table, week, buf)
       computeStages(table, week, stages)
       expect(Array.from(stages)).toEqual(Array.from(buf.stage))
+    }
+  })
+
+  it('incremental frames match full recomputes, forwards and backwards', () => {
+    const inc = createFrameBuffers(table.count)
+    const full = createFrameBuffers(table.count)
+    const weeks = [0, 0.3, 2, 2.05, 10, 25.5, 26, 40, 52, 51.2, 30, 12.4, 0]
+    let prev = -1
+    for (const week of weeks) {
+      computeFrameIncremental(table, prev, week, inc)
+      computeFrame(table, week, full)
+      expect(Array.from(inc.x)).toEqual(Array.from(full.x))
+      expect(Array.from(inc.alpha)).toEqual(Array.from(full.alpha))
+      expect(Array.from(inc.stage)).toEqual(Array.from(full.stage))
+      prev = week
     }
   })
 })

@@ -4,12 +4,6 @@
  */
 import { chromium } from '@playwright/test'
 
-declare global {
-  interface Window {
-    __trialFlow?: { screenPositionOf(id: number): { x: number; y: number } | null }
-  }
-}
-
 const url = process.argv[2] ?? 'http://localhost:4173/TrialFlow/'
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],

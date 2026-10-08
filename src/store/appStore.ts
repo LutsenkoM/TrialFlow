@@ -3,6 +3,7 @@ import type { ArmId, Patient, Sex, Stage } from '../data/types'
 import { STUDY } from '../data/studyConfig'
 
 export type Speed = 0.5 | 1 | 2 | 4
+export type Quality = 'high' | 'medium' | 'low'
 export type StatusFilter =
   'screening' | 'screen_failed' | 'treatment' | 'completed' | 'discontinued'
 
@@ -34,6 +35,9 @@ export interface AppState {
   reducedMotion: boolean
   /** True while the intro sequence runs. */
   intro: boolean
+  quality: Quality
+  /** Drop quality automatically when FPS stays low. */
+  autoQuality: boolean
   setPatients: (patients: Patient[]) => void
   setWeek: (week: number) => void
   setPlaying: (playing: boolean) => void
@@ -45,6 +49,7 @@ export interface AppState {
   hover: (id: number | null) => void
   setReducedMotion: (v: boolean) => void
   setIntro: (v: boolean) => void
+  setQuality: (q: Quality, auto?: boolean) => void
 }
 
 export function clampWeek(week: number): number {
@@ -63,6 +68,8 @@ export const useAppStore = create<AppState>()((set) => ({
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
   intro: false,
+  quality: 'high',
+  autoQuality: true,
   setPatients: (patients) => set({ patients }),
   setWeek: (week) => set({ week: clampWeek(week) }),
   setPlaying: (playing) => set({ playing }),
@@ -79,6 +86,9 @@ export const useAppStore = create<AppState>()((set) => ({
   hover: (hoveredId) => set({ hoveredId }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
   setIntro: (intro) => set({ intro }),
+  // A manual choice turns auto-degrade off; the auto path keeps it on.
+  setQuality: (quality, auto = false) =>
+    set((s) => ({ quality, autoQuality: auto ? s.autoQuality : false })),
 }))
 
 export type { Stage }

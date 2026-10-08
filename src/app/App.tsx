@@ -12,6 +12,7 @@ import { IntroOverlay } from '../ui/IntroOverlay'
 import { KpiStrip } from '../ui/KpiStrip'
 import { MobileSheet } from '../ui/MobileSheet'
 import { PatientCard } from '../ui/PatientCard'
+import { PerfOverlay } from '../ui/PerfOverlay'
 import { Timeline } from '../ui/Timeline'
 import { useInsights } from '../ui/useInsights'
 import { useKeyboardShortcuts } from '../ui/useKeyboardShortcuts'
@@ -24,7 +25,9 @@ export function App() {
   const hasSelection = useAppStore((s) => s.selectedId !== null)
   const patientCount = useAppStore((s) => s.patients.length)
   const [{ debug }] = useState(readParams)
-  const [showStats, setShowStats] = useState(false)
+  const [showStats, setShowStats] = useState(() =>
+    new URLSearchParams(window.location.search).has('stats'),
+  )
   const toggleStats = useCallback(() => setShowStats((v) => !v), [])
   const { ready, showIntro, skip } = useBootSequence()
   const insights = useInsights()
@@ -45,7 +48,7 @@ export function App() {
       </AnimatePresence>
       <HoverTooltip />
       {debug && <DebugPanel />}
-      {showStats && null}
+      <AnimatePresence>{showStats && <PerfOverlay key="perf" />}</AnimatePresence>
     </div>
   )
 }

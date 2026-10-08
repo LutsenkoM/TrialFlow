@@ -58,6 +58,10 @@ export function useBootSequence() {
     let cancelled = false
     const { week, count, select } = readParams()
     if (week !== null) useAppStore.getState().setWeek(Number(week))
+    // ?quality=high|medium|low pins the quality level (and disables auto-degrade) for benchmarks.
+    const quality = new URLSearchParams(window.location.search).get('quality')
+    if (quality === 'high' || quality === 'medium' || quality === 'low')
+      useAppStore.getState().setQuality(quality)
     loadPatients({ patientCount: count })
       .then(({ patients }) => {
         if (cancelled) return

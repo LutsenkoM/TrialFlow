@@ -234,7 +234,12 @@ export class ZonesLayer extends Container {
     }
   }
 
+  private readonly lastCounts = new Map<ZoneKey, number>()
+
+  /** Only touches the Text when the value changes (each change re-rasterises the label). */
   setCount(key: ZoneKey, n: number) {
+    if (this.lastCounts.get(key) === n) return
+    this.lastCounts.set(key, n)
     const z = this.zones.get(key)
     if (z?.count) z.count.text = n.toLocaleString('en-US')
   }

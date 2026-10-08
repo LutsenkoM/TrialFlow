@@ -89,38 +89,40 @@ export interface KmPoint {
  */
 export function kaplanMeier(t: PatientTable, week: number, mask: Uint8Array): KmPoint[][] {
   const scale = STUDY.treatmentTimeScale
-  const perArm: { time: number; event: boolean }[][] = [[], [], []]
+  // Packed sort keys (typed arrays sort natively, no per-patient objects):
+  // key = round(time * 1e5) * 2 + (censored ? 1 : 0), so events sort before censorings at ties.
+  const keys = [new Float64Array(t.count), new Float64Array(t.count), new Float64Array(t.count)]
+  const sizes = [0, 0, 0]
   for (let i = 0; i < t.count; i++) {
     const arm = t.arm[i]
     if (!mask[i] || arm < 0 || week < t.decisionWeek[i]) continue
     const end = t.endWeek[i]
-    const observedEnd = Math.min(end, week)
-    const time = (observedEnd - t.decisionWeek[i]) / scale
+    const time = (Math.min(end, week) - t.decisionWeek[i]) / scale
     const event = end <= week && t.outcome[i] > 0
-    perArm[arm].push({ time, event })
+    keys[arm][sizes[arm]++] = Math.round(time * 1e5) * 2 + (event ? 0 : 1)
   }
-  return perArm.map((obs) => {
-    obs.sort((a, b) => a.time - b.time || Number(b.event) - Number(a.event))
+  return keys.map((all, arm) => {
+    const obs = all.subarray(0, sizes[arm]).sort()
     const curve: KmPoint[] = [{ t: 0, s: 1 }]
     let atRisk = obs.length
     let s = 1
     let k = 0
     while (k < obs.length) {
-      const time = obs[k].time
+      const tick = Math.floor(obs[k] / 2)
       let events = 0
       let leaving = 0
-      while (k < obs.length && obs[k].time === time) {
-        if (obs[k].event) events++
+      while (k < obs.length && Math.floor(obs[k] / 2) === tick) {
+        if (obs[k] % 2 === 0) events++
         leaving++
         k++
       }
       if (events > 0 && atRisk > 0) {
         s *= 1 - events / atRisk
-        curve.push({ t: time, s })
+        curve.push({ t: tick / 1e5, s })
       }
       atRisk -= leaving
     }
-    const maxT = obs.length ? obs[obs.length - 1].time : 0
+    const maxT = obs.length ? Math.floor(obs[obs.length - 1] / 2) / 1e5 : 0
     if (curve[curve.length - 1].t < maxT) curve.push({ t: maxT, s })
     return curve
   })

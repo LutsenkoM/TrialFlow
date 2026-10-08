@@ -131,7 +131,7 @@ export function computeParticle(
   if (arm < 0) {
     out.stage[o] = STAGE.screenFailed
     out.tint[o] = colors.screenFail
-    out.scale[o] = baseScale * 0.85
+    out.scale[o] = baseScale
     discSlot(layout.screenFail, r0, r1)
     const k = (week - dec) / TRANSITION.fail
     if (k < 1) {
@@ -203,7 +203,7 @@ export function computeParticle(
   }
 
   out.stage[o] = STAGE.discontinued
-  out.scale[o] = baseScale * 0.85
+  out.scale[o] = baseScale
   discSlot(POOLS[outcome - 1], r0, r1)
   if (k < 1) {
     const e = easeInOutCubic(k)
@@ -219,6 +219,31 @@ export function computeParticle(
     out.y[o] = sy
     out.tint[o] = lerpColor(armColor, colors.reasons.lack_of_efficacy, 0.35)
     out.alpha[o] = 0.55
+  }
+}
+
+/**
+ * Like computeFrame, but skips particles that are static at both `prevWeek` and `week`:
+ * not yet screened, or settled in a sink after their last transition. Results are
+ * identical to a full recompute (see tests); pass prevWeek < 0 to force a full pass.
+ */
+export function computeFrameIncremental(
+  t: PatientTable,
+  prevWeek: number,
+  week: number,
+  out: FrameBuffers,
+) {
+  if (prevWeek < 0) {
+    computeFrame(t, week, out)
+    return
+  }
+  for (let i = 0; i < t.count; i++) {
+    const start = t.screenWeek[i]
+    if (week < start && prevWeek < start) continue
+    const settle =
+      t.arm[i] < 0 ? t.decisionWeek[i] + TRANSITION.fail : t.endWeek[i] + TRANSITION.sink
+    if (week >= settle && prevWeek >= settle) continue
+    computeParticle(t, i, week, out)
   }
 }
 
