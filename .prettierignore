@@ -1,0 +1,6 @@
+dist
+node_modules
+docs/screenshots
+package-lock.json
+.idea
+*.md
