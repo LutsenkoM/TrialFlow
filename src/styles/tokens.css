@@ -1,0 +1,51 @@
+:root {
+  --bg: #060a14;
+  --bg-raised: #0b1222;
+  --ink: #e8edf7;
+  --ink-muted: #8b95ab;
+  --ink-faint: #4a5470;
+  --line: rgb(140 160 210 / 14%);
+  --line-strong: rgb(160 180 230 / 24%);
+
+  --arm-placebo: #3fd8ff;
+  --arm-low: #a07cff;
+  --arm-high: #ffb547;
+  --neutral: #a4adc2;
+  --success: #5cf2b0;
+  --danger: #ff6b8b;
+
+  --glass-bg: rgb(14 20 38 / 58%);
+  --glass-bg-strong: rgb(14 20 38 / 78%);
+  --glass-border: rgb(170 190 255 / 10%);
+  --glass-highlight: rgb(255 255 255 / 6%);
+  --glass-blur: 18px;
+  --shadow-panel: 0 1px 0 0 var(--glass-highlight) inset, 0 24px 60px -20px rgb(0 0 0 / 70%);
+
+  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --s1: 8px;
+  --s2: 16px;
+  --s3: 24px;
+  --s4: 32px;
+  --s5: 40px;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 600ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}

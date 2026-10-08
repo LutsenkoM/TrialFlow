@@ -1,0 +1,51 @@
+.host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 40%, #0a1226 0%, #060a14 55%, #04070f 100%);
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+}
+
+/* Slow-drifting gradient mesh behind the scene. */
+.mesh {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(35% 40% at 20% 30%, rgb(63 216 255 / 9%), transparent 70%),
+    radial-gradient(30% 35% at 78% 22%, rgb(160 124 255 / 10%), transparent 70%),
+    radial-gradient(35% 40% at 70% 82%, rgb(255 181 71 / 6%), transparent 70%),
+    radial-gradient(40% 45% at 35% 85%, rgb(80 110 255 / 7%), transparent 70%);
+  filter: blur(20px);
+  animation: drift 38s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    transform: translate3d(3%, 2%, 0) rotate(6deg) scale(1.08);
+  }
+}
+
+/* Film grain via SVG turbulence. */
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh {
+    animation: none;
+  }
+}

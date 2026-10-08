@@ -13,3 +13,8 @@
 - Randomization: permuted blocks of 6 per site in order of randomization date → near-exact 1:1:1.
 - Dropout: constant weekly competing-risks hazards per arm and reason (exponential draw); a dropout attends only visits strictly before the dropout time.
 - Patients are kept as plain objects in the zustand store (set once); per-frame rendering will use derived typed arrays, not the store.
+- Scene is an imperative `TrialScene` class mounted from `@pixi/react`'s `<Application>` via `useApplication()`; Pixi objects are not declared as JSX so React never touches them per frame.
+- Particles: one Pixi v8 `ParticleContainer` of `Particle`s (single texture, additive blend), positions from the pure `core/particleModel` writing into reused typed arrays.
+- Background gradient mesh + grain are CSS layers behind a transparent canvas (zero GPU cost in Pixi); starfield is a separate screen-space ParticleContainer with camera parallax.
+- Portrait screens frame the lanes at 62% of screen height instead of fitting the whole world (which would be unreadably small at 390px).
+- Fonts are bundled via `@fontsource-variable` (Inter, JetBrains Mono) and explicitly loaded before Pixi text is created.
