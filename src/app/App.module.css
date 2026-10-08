@@ -3,3 +3,32 @@
   inset: 0;
   overflow: hidden;
 }
+
+/* UI chrome floats above the canvas; only the panels themselves capture pointer events. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: var(--s3);
+  pointer-events: none;
+}
+
+.top {
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.bottom {
+  grid-row: 3;
+  justify-self: center;
+  width: min(1040px, 100%);
+}
+
+@media (max-width: 720px) {
+  .overlay {
+    padding: var(--s2);
+  }
+}

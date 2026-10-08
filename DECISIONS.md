@@ -18,3 +18,6 @@
 - Background gradient mesh + grain are CSS layers behind a transparent canvas (zero GPU cost in Pixi); starfield is a separate screen-space ParticleContainer with camera parallax.
 - Portrait screens frame the lanes at 62% of screen height instead of fitting the whole world (which would be unreadably small at 390px).
 - Fonts are bundled via `@fontsource-variable` (Inter, JetBrains Mono) and explicitly loaded before Pixi text is created.
+- Playback clock runs in the Pixi ticker and writes `week` to the store; UI that shows the week every frame (playhead, readout) subscribes imperatively and writes to the DOM, so React doesn't re-render per frame.
+- Scrubber "visit markers": a histogram of scheduled visits + screenings per half-week (where the study is busy) plus diamond milestones (first randomized, enrollment closes, first completion, last visit). Protocol visit weeks are shown as ticks on each lane in the scene.
+- Flow ribbons are linear in patient count (true Sankey). Discontinuation ribbons are per reason (pooled across arms) and drop from the bottom lane to keep the scene readable.
