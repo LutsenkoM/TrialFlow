@@ -17,9 +17,12 @@ const viewports = [
 ] as const
 
 mkdirSync(outDir, { recursive: true })
-const browser = await chromium.launch({
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-})
+// Real GPU on macOS (ANGLE/Metal); software rendering elsewhere.
+const browser = await chromium.launch(
+  process.platform === 'darwin'
+    ? { channel: 'chromium', args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu'] }
+    : { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
+)
 const errors: string[] = []
 
 for (const vp of viewports) {
