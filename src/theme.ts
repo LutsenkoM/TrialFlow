@@ -20,9 +20,9 @@ export const colors = {
   } satisfies Record<ArmId, number>,
   reasons: {
     adverse_event: 0xff6b8b,
-    lack_of_efficacy: 0x7c89a8,
+    lack_of_efficacy: 0x8a93c4,
     withdrawal: 0xc2a1ff,
-    lost_to_follow_up: 0x5f6f8c,
+    lost_to_follow_up: 0x4f8a97,
   } satisfies Record<DiscontinuationReason, number>,
   success: 0x5cf2b0,
 } as const

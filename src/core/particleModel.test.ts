@@ -3,7 +3,7 @@ import { generatePatients } from '../data/generator'
 import { getPatientStateAt } from '../data/patientState'
 import type { Stage } from '../data/types'
 import { buildPatientTable } from './patientTable'
-import { STAGE, computeFrame, createFrameBuffers } from './particleModel'
+import { STAGE, computeFrame, computeStages, createFrameBuffers } from './particleModel'
 
 const patients = generatePatients({ patientCount: 2000 })
 const table = buildPatientTable(patients)
@@ -49,5 +49,15 @@ describe('particleModel', () => {
     computeFrame(table, 50, back)
     computeFrame(table, 30, back)
     expect(Array.from(back.x)).toEqual(Array.from(forward.x))
+  })
+
+  it('computeStages matches the full frame computation', () => {
+    const buf = createFrameBuffers(table.count)
+    const stages = new Uint8Array(table.count)
+    for (const week of [2, 17.5, 33, 52]) {
+      computeFrame(table, week, buf)
+      computeStages(table, week, stages)
+      expect(Array.from(stages)).toEqual(Array.from(buf.stage))
+    }
   })
 })

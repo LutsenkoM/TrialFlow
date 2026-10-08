@@ -79,5 +79,30 @@ if (pos) {
   )
 } else check(false, 'found a particle on screen to click')
 
+// Filters: High Dose only should reduce the randomized KPI to about a third.
+const kpi = async (label: string) =>
+  Number(
+    (
+      await page
+        .locator(`text=${label}`)
+        .locator('xpath=ancestor::div[contains(@class,"card")][1]')
+        .locator('.num')
+        .first()
+        .textContent()
+    )?.replace(/,/g, ''),
+  )
+await page.keyboard.press('End')
+await page.waitForTimeout(1200)
+const before = await kpi('Randomized')
+await page.getByRole('button', { name: 'Filters', exact: true }).click()
+await page.getByRole('button', { name: 'High Dose' }).click()
+await page.waitForTimeout(1200)
+const after = await kpi('Randomized')
+check(
+  after > before * 0.28 && after < before * 0.38,
+  `arm filter narrows KPIs (${before} → ${after})`,
+)
+await page.getByRole('button', { name: 'Reset', exact: true }).click()
+
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join(' | ') : ''}`)
 await browser.close()

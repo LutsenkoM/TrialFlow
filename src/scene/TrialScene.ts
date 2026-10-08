@@ -12,7 +12,7 @@ import { buildFilterMask, computeEmphasis, isFilterActive } from '../core/filter
 import { computeFlowStats, createFlowStats, sum, type FlowStats } from '../core/flowStats'
 import { WORLD } from '../core/layout'
 import { STAGE, computeFrame, createFrameBuffers, type FrameBuffers } from '../core/particleModel'
-import { buildPatientTable, type PatientTable } from '../core/patientTable'
+import { getPatientTable, type PatientTable } from '../core/patientTable'
 import { advanceWeek } from '../core/playback'
 import { SpatialGrid } from '../core/spatialGrid'
 import { STUDY } from '../data/studyConfig'
@@ -130,7 +130,7 @@ export class TrialScene {
     this.table = null
     this.frame = null
     if (patients.length === 0) return
-    const table = buildPatientTable(patients)
+    const table = getPatientTable(patients)
     const n = table.count
     this.table = table
     this.frame = createFrameBuffers(n)
@@ -213,7 +213,7 @@ export class TrialScene {
     const { table, frame } = this
     if (!table || !frame) return
     this.emphasisDirty = false
-    buildFilterMask(table, frame, state.filters, this.filterMask)
+    buildFilterMask(table, frame.stage, state.filters, this.filterMask)
     const active = isFilterActive(state.filters, STUDY.ageRange.min, STUDY.ageRange.max)
     this.emphasisFrom.set(this.emphasis)
     computeEmphasis(this.filterMask, active, state.selectedId, this.emphasisTo)

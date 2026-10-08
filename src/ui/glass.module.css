@@ -1,5 +1,5 @@
 .glass {
-  background: linear-gradient(180deg, rgb(22 30 54 / 62%), rgb(10 15 30 / 58%));
+  background: linear-gradient(180deg, rgb(20 28 50 / 78%), rgb(9 13 27 / 74%));
   backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border: 1px solid var(--glass-border);

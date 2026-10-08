@@ -5,7 +5,7 @@ import { colors, fonts } from '../theme'
 
 const LABEL_STYLE = {
   fontFamily: fonts.sans,
-  fontSize: 15,
+  fontSize: 19,
   fontWeight: '600',
   letterSpacing: 2.4,
   fill: colors.inkMuted,
@@ -13,14 +13,14 @@ const LABEL_STYLE = {
 
 const COUNT_STYLE = {
   fontFamily: fonts.mono,
-  fontSize: 22,
+  fontSize: 28,
   fontWeight: '500',
   fill: colors.ink,
 } as const
 
 const SMALL_STYLE = {
   fontFamily: fonts.mono,
-  fontSize: 14,
+  fontSize: 17,
   fill: colors.inkMuted,
   letterSpacing: 0.5,
 } as const
@@ -104,7 +104,7 @@ export class ZonesLayer extends Container {
     const s = layout.screening
     this.ring({ ...s, r: s.r + 14 }, colors.neutral, 0.22, true)
     this.ring(s, colors.neutral, 0.08)
-    this.labels.addChild(makeText('SCREENING', LABEL_STYLE, s.x, s.y - s.r - 58))
+    this.labels.addChild(makeText('SCREENING', LABEL_STYLE, s.x, s.y - s.r - 68))
     const count = makeText('0', COUNT_STYLE, s.x, s.y - s.r - 32)
     this.labels.addChild(count)
     this.addHalo('screening', s, colors.neutral, 0.1, count)
@@ -112,7 +112,7 @@ export class ZonesLayer extends Container {
     const f = layout.screenFail
     this.ring({ ...f, r: f.r + 10 }, colors.screenFail, 0.25, true)
     this.labels.addChild(makeText('SCREEN FAIL', LABEL_STYLE, f.x, f.y + f.r + 36))
-    const failCount = makeText('0', COUNT_STYLE, f.x, f.y + f.r + 62)
+    const failCount = makeText('0', COUNT_STYLE, f.x, f.y + f.r + 70)
     this.labels.addChild(failCount)
     this.addHalo('screenFail', f, colors.screenFail, 0.06, failCount)
   }
@@ -174,7 +174,7 @@ export class ZonesLayer extends Container {
       this.labels.addChild(label)
       const count = makeText(
         '0',
-        { ...COUNT_STYLE, fontSize: 18 },
+        { ...COUNT_STYLE, fontSize: 22 },
         lane.x0 + label.width + 16,
         top - 22,
         0,
@@ -193,9 +193,9 @@ export class ZonesLayer extends Container {
   private drawSinks() {
     const zone = layout.completedZone
     this.labels.addChild(
-      makeText('COMPLETED', LABEL_STYLE, zone.x, layout.completed.placebo.y - 172),
+      makeText('COMPLETED', LABEL_STYLE, zone.x, layout.completed.placebo.y - 186),
     )
-    const doneCount = makeText('0', COUNT_STYLE, zone.x, layout.completed.placebo.y - 146)
+    const doneCount = makeText('0', COUNT_STYLE, zone.x, layout.completed.placebo.y - 152)
     this.labels.addChild(doneCount)
     for (const arm of ARMS) {
       const d = layout.completed[arm.id]
@@ -228,7 +228,7 @@ export class ZonesLayer extends Container {
       this.labels.addChild(
         makeText(reason.label, { ...SMALL_STYLE, fill: colors.inkMuted }, d.x, d.y + d.r + 30),
       )
-      const count = makeText('0', { ...COUNT_STYLE, fontSize: 18 }, d.x, d.y + d.r + 54)
+      const count = makeText('0', { ...COUNT_STYLE, fontSize: 22 }, d.x, d.y + d.r + 62)
       this.labels.addChild(count)
       this.addHalo(reason.id, d, color, 0.05, count)
     }

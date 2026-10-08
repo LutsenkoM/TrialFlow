@@ -25,3 +25,8 @@
 - Camera flights and emphasis cross-fades use GSAP tweening plain objects (camera centre/scale, a single `mix` value) rather than tweening 15k display objects.
 - A tiny `window.__trialFlow` handle (screen position of a particle) exists so the Playwright smoke test can click a real particle.
 - Deep links: `?week=`, `?select=`, `?n=` (population size) and `?debug` for screenshots and demos.
+- Insights (KPIs, KM, discontinuation bars, heatmap) follow the active filters and are computed in React from the shared typed-array table at half-week resolution (a few updates/sec), never per frame.
+- KM curves use a data cut at the current week: discontinuation = event, completion or still-on-study = censored; x-axis is protocol weeks since randomization.
+- Discontinuation reasons are shown as stacked bars per arm (share of randomized) rather than a donut — easier to compare arms side by side.
+- Non-matching particles dim and shrink rather than blur: a per-particle blur isn't possible inside one batched ParticleContainer without splitting it.
+- The patient card replaces the insights panel while a patient is selected (one right-hand column, less clutter).

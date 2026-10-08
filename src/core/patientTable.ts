@@ -73,3 +73,15 @@ export function buildPatientTable(patients: readonly Patient[], seed = 7): Patie
   }
   return t
 }
+
+const cache = new WeakMap<readonly Patient[], PatientTable>()
+
+/** Shared, memoised table so the scene and the UI derive from the same arrays. */
+export function getPatientTable(patients: readonly Patient[]): PatientTable {
+  let t = cache.get(patients)
+  if (!t) {
+    t = buildPatientTable(patients)
+    cache.set(patients, t)
+  }
+  return t
+}

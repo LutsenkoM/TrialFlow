@@ -216,3 +216,14 @@ export function computeParticle(t: PatientTable, i: number, week: number, out: F
 export function computeFrame(t: PatientTable, week: number, out: FrameBuffers) {
   for (let i = 0; i < t.count; i++) computeParticle(t, i, week, out)
 }
+
+/** Stage codes only (no positions) — cheap path for UI-side filtering. */
+export function computeStages(t: PatientTable, week: number, out: Uint8Array) {
+  for (let i = 0; i < t.count; i++) {
+    if (week < t.screenWeek[i]) out[i] = STAGE.hidden
+    else if (week < t.decisionWeek[i]) out[i] = STAGE.screening
+    else if (t.arm[i] < 0) out[i] = STAGE.screenFailed
+    else if (week < t.endWeek[i]) out[i] = STAGE.treatment
+    else out[i] = t.outcome[i] === 0 ? STAGE.completed : STAGE.discontinued
+  }
+}

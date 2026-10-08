@@ -13,7 +13,7 @@ const mask = new Uint8Array(table.count)
 
 describe('filters', () => {
   it('matches everyone with empty filters', () => {
-    expect(buildFilterMask(table, frame, EMPTY_FILTERS, mask)).toBe(table.count)
+    expect(buildFilterMask(table, frame.stage, EMPTY_FILTERS, mask)).toBe(table.count)
     expect(isFilterActive(EMPTY_FILTERS, 18, 80)).toBe(false)
   })
 
@@ -24,7 +24,7 @@ describe('filters', () => {
       sexes: ['F' as const],
       ageRange: [40, 60] as [number, number],
     }
-    const n = buildFilterMask(table, frame, f, mask)
+    const n = buildFilterMask(table, frame.stage, f, mask)
     const expected = patients.filter(
       (p) => p.arm === 'high' && p.sex === 'F' && p.age >= 40 && p.age <= 60,
     ).length
@@ -33,7 +33,12 @@ describe('filters', () => {
   })
 
   it('filters status by the stage at the current week', () => {
-    const n = buildFilterMask(table, frame, { ...EMPTY_FILTERS, statuses: ['completed'] }, mask)
+    const n = buildFilterMask(
+      table,
+      frame.stage,
+      { ...EMPTY_FILTERS, statuses: ['completed'] },
+      mask,
+    )
     let completed = 0
     for (let i = 0; i < table.count; i++) if (frame.stage[i] === STAGE.completed) completed++
     expect(n).toBe(completed)

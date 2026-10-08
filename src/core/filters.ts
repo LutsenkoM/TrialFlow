@@ -1,6 +1,6 @@
 import type { Filters, StatusFilter } from '../store/appStore'
 import { ARM_INDEX } from './layout'
-import { STAGE, type FrameBuffers } from './particleModel'
+import { STAGE } from './particleModel'
 import type { PatientTable } from './patientTable'
 
 const STATUS_STAGE: Record<StatusFilter, number> = {
@@ -22,10 +22,10 @@ export function isFilterActive(f: Filters, ageMin: number, ageMax: number): bool
   )
 }
 
-/** Writes 1/0 per patient into `out`. Status filters use the stage at the current frame. */
+/** Writes 1/0 per patient into `out`. Status filters use `stage` (stage codes at the current week). */
 export function buildFilterMask(
   table: PatientTable,
-  frame: FrameBuffers,
+  stage: Uint8Array,
   f: Filters,
   out: Uint8Array,
 ): number {
@@ -40,7 +40,7 @@ export function buildFilterMask(
       (arms.size === 0 || arms.has(table.arm[i])) &&
       (sites.size === 0 || sites.has(table.site[i])) &&
       (sexes.size === 0 || sexes.has(table.sex[i])) &&
-      (stages.size === 0 || stages.has(frame.stage[i])) &&
+      (stages.size === 0 || stages.has(stage[i])) &&
       table.age[i] >= ageLo &&
       table.age[i] <= ageHi
     out[i] = ok ? 1 : 0

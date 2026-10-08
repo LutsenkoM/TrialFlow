@@ -1,0 +1,58 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  width: 340px;
+  max-height: 100%;
+  padding: var(--s2) var(--s3) var(--s3);
+  overflow: hidden auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: var(--s2);
+  border-top: 1px solid var(--glass-border);
+}
+
+.section:first-child {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.sectionHead h3 {
+  margin: 0;
+}
+
+.hint {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.armLegend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.armLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.armLegend i {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}

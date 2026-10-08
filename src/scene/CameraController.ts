@@ -27,12 +27,14 @@ export class CameraController {
   private applyClamps() {
     const vp = this.vp
     vp.clampZoom({ minScale: this.fitScale * 0.5, maxScale: Math.max(this.fitScale * 12, 3) })
+    // Generous bounds: the home view is deliberately off-centre (UI chrome), so the clamp
+    // must never "underflow-centre" it.
     vp.clamp({
-      left: -600,
-      right: WORLD.width + 400,
-      top: -400,
-      bottom: WORLD.height + 400,
-      underflow: 'center',
+      left: -WORLD.width,
+      right: WORLD.width * 2,
+      top: -WORLD.height,
+      bottom: WORLD.height * 2,
+      underflow: 'none',
     })
   }
 
@@ -42,14 +44,16 @@ export class CameraController {
     if (w / h < 0.9) {
       return { x: 1180, y: WORLD.height / 2 + 30, scale: (h * 0.6) / WORLD.height }
     }
-    const insetTop = 40
-    const insetBottom = 140
-    const scale = Math.min(
-      w / (WORLD.width + 200),
-      (h - insetTop - insetBottom) / (WORLD.height + 40),
-    )
-    const shift = (insetBottom - insetTop) / 2 / scale
-    return { x: WORLD.width / 2 - 40, y: WORLD.height / 2 + shift, scale }
+    // Screen space taken by UI chrome (header/KPIs, insights panel, timeline).
+    const wide = w > 1100
+    const inset = { top: wide ? 150 : 210, bottom: 130, left: 16, right: wide ? 390 : 16 }
+    const availW = w - inset.left - inset.right
+    const availH = h - inset.top - inset.bottom
+    const scale = Math.min(availW / (WORLD.width + 80), availH / (WORLD.height + 20))
+    // Shift the world centre so it lands in the middle of the free area.
+    const dx = (inset.right - inset.left) / 2 / scale
+    const dy = (inset.bottom - inset.top) / 2 / scale
+    return { x: WORLD.width / 2 - 70 + dx, y: WORLD.height / 2 + dy, scale }
   }
 
   home(animate = false) {
